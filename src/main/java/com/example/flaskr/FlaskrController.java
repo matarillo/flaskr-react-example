@@ -1,10 +1,13 @@
 package com.example.flaskr;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.jdbc.core.mapping.AggregateReference;
 import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.time.LocalDateTime;
@@ -16,10 +19,12 @@ public class FlaskrController {
 
     private final UserRepository userRepository;
     private final PostRepository postRepository;
+    private final PostService postService;
 
-    public FlaskrController(UserRepository userRepository, PostRepository postRepository) {
+    public FlaskrController(UserRepository userRepository, PostRepository postRepository, PostService postService) {
         this.userRepository = userRepository;
         this.postRepository = postRepository;
+        this.postService = postService;
     }
 
     @GetMapping("/hello")
@@ -39,6 +44,18 @@ public class FlaskrController {
         return oUser.map(user -> "User ID = " + user.getId()).orElse("User not found");
     }
 
+    /**
+     * 指定したユーザーIDの記事を取得するエンドポイント（ページング対応）
+     * 例: /users/1/posts?page=0&size=10
+     */
+    @GetMapping("/users/{userId}/posts")
+    @ResponseBody
+    public Page<Post> getUserPosts(
+            @PathVariable Integer userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return postService.getPostsByUserId(userId, page, size);
+    }
 
     private String hash(String password) {
         Pbkdf2PasswordEncoder encoder = Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8();
