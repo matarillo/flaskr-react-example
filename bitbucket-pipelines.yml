@@ -1,0 +1,26 @@
+image: openjdk:17
+
+clone:
+  depth: full              # SonarQube Cloud scanner needs the full history to assign issues properly
+
+definitions:
+  caches:
+    sonar: ~/.sonar/cache  # Caching SonarQube Cloud artifacts will speed up your build
+  steps:
+    - step: &build-test-sonarcloud
+        name: Build, test and analyze on SonarQube Cloud
+        caches:
+          - gradle
+          - sonar
+        script:
+          - ./gradlew test --continue jacocoTestReport sonar
+        artifacts:
+          - build/libs/**
+
+pipelines:                 # More info here: https://confluence.atlassian.com/bitbucket/configure-bitbucket-pipelines-yml-792298910.html
+  branches:
+    master:
+      - step: *build-test-sonarcloud
+  pull-requests:
+    '**':
+      - step: *build-test-sonarcloud
