@@ -135,4 +135,15 @@ class PostServiceTest {
             previousCreated = post.getCreated();
         }
     }
+
+    @Test
+    void testUpdatePost_WithInvalidId_ShouldNotThrowException() {
+        // わざと失敗するテスト：存在しないIDで更新しても例外が投げられないと期待（実際は例外が投げられる）
+        Integer nonExistentId = 99999;
+        
+        // このテストは失敗する - 実際にはIllegalArgumentExceptionが投げられるため
+        assertDoesNotThrow(() -> {
+            postService.updatePost(nonExistentId, "Updated Title", "Updated Body");
+        });
+    }
 }
