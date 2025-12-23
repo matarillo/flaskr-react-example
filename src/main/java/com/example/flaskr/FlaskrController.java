@@ -2,7 +2,6 @@ package com.example.flaskr;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.jdbc.core.mapping.AggregateReference;
-import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,10 +54,5 @@ public class FlaskrController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return postService.getPostsByUserId(userId, page, size);
-    }
-
-    private String hash(String password) {
-        Pbkdf2PasswordEncoder encoder = Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8();
-        return encoder.encode(password);
     }
 }
