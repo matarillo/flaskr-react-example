@@ -7,7 +7,6 @@ build/
 
 ### Frontend ###
 /src/main/resources/static/*
-!/src/main/resources/static/.gitkeep
 
 ### STS ###
 .apt_generated
