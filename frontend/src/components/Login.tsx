@@ -2,7 +2,8 @@ import './Login.css'
 
 function Login() {
   return (
-    <section className="content">
+    <>
+      <title>Log in - Flaskr</title>
       <header>
         <h1>Log In</h1>
       </header>
@@ -14,7 +15,7 @@ function Login() {
         <input type="password" name="password" id="password" required />
         <input type="submit" value="Log In" />
       </form>
-    </section>
+    </>
   )
 }
 
