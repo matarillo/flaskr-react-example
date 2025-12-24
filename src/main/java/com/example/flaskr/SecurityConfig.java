@@ -62,8 +62,8 @@ public class SecurityConfig {
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         // H2 Consoleを許可 (開発環境用)
                         .requestMatchers(PathRequest.toH2Console()).permitAll()
-                        // SPAのメインページを許可
-                        .requestMatchers("/", "/index.html").permitAll()
+                        // SPAのビルド生成物を許可
+                        .requestMatchers("/", "/index.html", "/assets/**").permitAll()
                         // 公開APIを許可
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated() // その他のリクエストは認証が必要
