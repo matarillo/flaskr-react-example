@@ -62,14 +62,11 @@ public class SecurityConfig {
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         .requestMatchers(PathRequest.toH2Console()).permitAll()
 
-                        // 公開APIを許可
-                        .requestMatchers("/api/auth/**").permitAll()
-
-                        // API以外の全てのパス (SPAのルーティング用) を許可
-                        .requestMatchers(request -> !request.getServletPath().startsWith("/api")).permitAll()
-
-                        // 上記以外の /api/** へのリクエストは認証必須
-                        .anyRequest().authenticated()
+                        // 全てのパスを許可
+                        // .requestMatchers("/api/auth/**").permitAll()
+                        // .requestMatchers(request -> !request.getServletPath().startsWith("/api")).permitAll()
+                        // .anyRequest().authenticated()
+                        .anyRequest().permitAll()
                 )
 
                 // HTTPBasic認証を無効化
