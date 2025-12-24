@@ -11,6 +11,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -46,7 +47,7 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isCreated())
@@ -65,13 +66,13 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isCreated());
 
         // 重複ユーザー名で登録試行
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isBadRequest())
@@ -89,7 +90,7 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerBody))
                 .andExpect(status().isCreated());
@@ -102,7 +103,7 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginBody))
                 .andExpect(status().isOk())
@@ -121,7 +122,7 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerBody))
                 .andExpect(status().isCreated());
@@ -134,7 +135,7 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/login")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginBody))
                 .andExpect(status().isUnauthorized())
@@ -152,7 +153,7 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerBody))
                 .andExpect(status().isCreated());
@@ -165,16 +166,17 @@ class AuthIntegrationTest {
             }}
         );
 
-        MvcResult loginResult = mockMvc.perform(post("/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginBody))
                 .andExpect(status().isOk())
                 .andReturn();
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession();
+        assertNotNull(session);
 
         // 現在のユーザー情報を取得
-        mockMvc.perform(get("/auth/current")
+        mockMvc.perform(get("/api/auth/current")
                 .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -185,7 +187,7 @@ class AuthIntegrationTest {
     @Test
     void testGetCurrentUser_NotAuthenticated() throws Exception {
         // 認証なしで現在のユーザー情報を取得
-        mockMvc.perform(get("/auth/current"))
+        mockMvc.perform(get("/api/auth/current"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Not authenticated"));
@@ -201,7 +203,7 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerBody))
                 .andExpect(status().isCreated());
@@ -214,23 +216,24 @@ class AuthIntegrationTest {
             }}
         );
 
-        MvcResult loginResult = mockMvc.perform(post("/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginBody))
                 .andExpect(status().isOk())
                 .andReturn();
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession();
+        assertNotNull(session);
 
         // ログアウト
-        mockMvc.perform(post("/auth/logout")
+        mockMvc.perform(post("/api/auth/logout")
                 .session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value("Logout successful"));
 
         // ログアウト後、認証が必要なエンドポイントにアクセス
-        mockMvc.perform(get("/auth/current")
+        mockMvc.perform(get("/api/auth/current")
                 .session(session))
                 .andExpect(status().isUnauthorized());
     }
@@ -253,7 +256,7 @@ class AuthIntegrationTest {
             }}
         );
 
-        mockMvc.perform(post("/auth/register")
+        mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(registerBody))
                 .andExpect(status().isCreated());
@@ -266,16 +269,17 @@ class AuthIntegrationTest {
             }}
         );
 
-        MvcResult loginResult = mockMvc.perform(post("/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginBody))
                 .andExpect(status().isOk())
                 .andReturn();
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession();
+        assertNotNull(session);
 
         // 認証済みで保護されたエンドポイントにアクセス
-        mockMvc.perform(get("/users/1/posts")
+        mockMvc.perform(get("/api/posts")
                 .session(session))
                 .andExpect(status().isOk());
     }

@@ -57,7 +57,7 @@ public class SecurityConfig {
             
             // 認証ルールの設定
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/auth/**", "/h2-console/**").permitAll() // 認証不要
+                .requestMatchers("/api/auth/**", "/h2-console/**").permitAll() // 認証不要
                 .anyRequest().authenticated() // その他のリクエストは認証が必要
             )
             

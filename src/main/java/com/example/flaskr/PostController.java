@@ -18,7 +18,7 @@ import java.util.Map;
  * 投稿記事関連のエンドポイントを提供するコントローラー
  */
 @RestController
-@RequestMapping("/posts")
+@RequestMapping("/api/posts")
 @RequiredArgsConstructor
 public class PostController {
 

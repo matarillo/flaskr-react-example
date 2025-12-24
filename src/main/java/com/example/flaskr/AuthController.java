@@ -23,7 +23,7 @@ import java.util.Map;
  * 認証関連のエンドポイントを提供するコントローラー
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
