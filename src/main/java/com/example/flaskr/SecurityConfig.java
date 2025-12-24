@@ -58,15 +58,18 @@ public class SecurityConfig {
 
                 // 認証ルールの設定
                 .authorizeHttpRequests(authz -> authz
-                        // 標準的な静的リソース（JS, CSS, 画像など）を一括で許可
+                        // 静的リソースとH2を許可
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
-                        // H2 Consoleを許可 (開発環境用)
                         .requestMatchers(PathRequest.toH2Console()).permitAll()
-                        // SPAのビルド生成物を許可
-                        .requestMatchers("/", "/index.html", "/assets/**").permitAll()
+
                         // 公開APIを許可
                         .requestMatchers("/api/auth/**").permitAll()
-                        .anyRequest().authenticated() // その他のリクエストは認証が必要
+
+                        // API以外の全てのパス (SPAのルーティング用) を許可
+                        .requestMatchers(request -> !request.getServletPath().startsWith("/api")).permitAll()
+
+                        // 上記以外の /api/** へのリクエストは認証必須
+                        .anyRequest().authenticated()
                 )
 
                 // HTTPBasic認証を無効化
