@@ -1,17 +1,13 @@
 package com.example.flaskr;
 
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
 
-@RestController
-@RequestMapping("/api")
+@Controller
 public class FlaskrController {
 
-    @GetMapping("/hello")
-    @ResponseBody
-    public String hello() {
-        return "Hello, World!";
+    @GetMapping("{path:^(?!api).*$}[^\\.]*")
+    public String redirect() {
+        return "forward:/index.html";
     }
 }
