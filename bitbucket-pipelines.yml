@@ -1,14 +1,13 @@
-image: eclipse-temurin:21-jdk
-
 clone:
-  depth: full              # SonarQube Cloud scanner needs the full history to assign issues properly
+  depth: full
 
 definitions:
   caches:
-    sonar: ~/.sonar/cache  # Caching SonarQube Cloud artifacts will speed up your build
+    sonar: ~/.sonar/cache
   steps:
-    - step: &build-test-sonarcloud
+    - step: &sonar-backend
         name: Build, test and analyze on SonarQube Cloud
+        image: gradle:jdk21
         caches:
           - gradle
           - sonar
@@ -16,27 +15,38 @@ definitions:
           - ./gradlew test --continue jacocoTestReport sonar
         artifacts:
           - build/libs/**
+    - step: &sonar-frontend
+        name: Build, test and analyze on SonarQube Cloud
+        image: node:22
+        caches:
+          - node
+          - sonar
+        script:
+          - cd frontend
+          - npm ci
+          - npm run test --
+            --run --coverage
+            --reporter=junit --outputFile=coverage/junit-report.xml
+            --reporter=default
+            || touch coverage/testfail
+          - pipe: sonarsource/sonarcloud-scan:4.0.0
+            variables:
+              SONAR_TOKEN: $SONAR_TOKEN_FRONT
+              EXTRA_ARGS:
+                - '-Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend'
+                - '-Dsonar.organization=matarillo-bitbucket'
+                - '-Dsonar.javascript.lcov.reportPaths=coverage/lcov.info'
+          - |
+            if [ -f coverage/testfail ]; then
+              echo "Vitest failed."
+              exit 1
+            fi
+        artifacts:
+          - frontend/coverage/**
 
-pipelines:                 # More info here: https://confluence.atlassian.com/bitbucket/configure-bitbucket-pipelines-yml-792298910.html
-  branches:
-    main:
-      - step: *build-test-sonarcloud
-  pull-requests:
-    '**':
-      - step: *build-test-sonarcloud
+pipelines:
   custom:
+    sonar-backend:
+      - step: *sonar-backend
     sonar-frontend:
-      - step:
-          name: Vitest frontend
-          image: node:22-bookworm
-          script:
-            - cd frontend
-            - npm ci
-            - npm run test -- --run --coverage || touch coverage/testfail
-            - npx -y -p @sonar/scan sonar
-                  -Dsonar.token=$SONAR_TOKEN_FRONT
-                  -Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend
-                  -Dsonar.organization=matarillo-bitbucket
-                  -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-          artifacts:
-            - frontend/coverage/**
+      - step: *sonar-frontend
