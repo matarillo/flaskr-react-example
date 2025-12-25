@@ -55,3 +55,11 @@ jacocoTestReport {
         xml.required = true
     }
 }
+
+sonar {
+  properties {
+    property "sonar.projectKey", "matarillo-bitbucket_flaskr-backend"
+    property "sonar.organization", "matarillo-bitbucket"
+	property "sonar.projectName", "flaskr-backend"
+  }
+}
