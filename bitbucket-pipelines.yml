@@ -30,9 +30,9 @@ definitions:
           - npm ci
           - npm run test --
             --run --coverage
-            --reporter=junit --outputFile=coverage/junit-report.xml
+            --reporter=junit --outputFile=vitest/junit-report.xml
             --reporter=default
-            || touch coverage/testfail
+            || touch vitest/testfail
           - pipe: sonarsource/sonarcloud-scan:4.0.0
             variables:
               SONAR_TOKEN: $SONAR_TOKEN_FRONT
@@ -40,13 +40,11 @@ definitions:
                 - '-Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend'
                 - '-Dsonar.organization=matarillo-bitbucket'
                 - '-Dsonar.javascript.lcov.reportPaths=coverage/lcov.info'
-          - |
-            if [ -f coverage/testfail ]; then
-              echo "Vitest failed."
-              exit 1
-            fi
+          - mkdir test-reports
+          - cp vitest/junit-report.xml test-reports/
         artifacts:
           - frontend/coverage/**
+          - frontend/test-reports/**
 
 pipelines:
   custom:
