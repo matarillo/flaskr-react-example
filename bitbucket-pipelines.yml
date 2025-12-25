@@ -33,6 +33,10 @@ pipelines:                 # More info here: https://confluence.atlassian.com/bi
             - cd frontend
             - npm ci
             - npm run test -- --run --coverage || touch coverage/testfail
-            - npx -y -p @sonar/scan sonar -Dsonar.token=$SONAR_TOKEN_FRONT -Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend -Dsonar.organization=matarillo-bitbucket
+            - npx -y -p @sonar/scan sonar
+                  -Dsonar.token=$SONAR_TOKEN_FRONT
+                  -Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend
+                  -Dsonar.organization=matarillo-bitbucket
+                  -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
           artifacts:
             - frontend/coverage/**
