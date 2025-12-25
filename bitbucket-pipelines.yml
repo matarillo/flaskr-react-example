@@ -42,6 +42,11 @@ definitions:
                 - '-Dsonar.javascript.lcov.reportPaths=coverage/lcov.info'
           - mkdir test-reports
           - cp vitest/junit-report.xml test-reports/
+          - |
+            if [ -f vitest/testfail ]; then
+              echo "Vitest failed."
+              exit 1
+            fi
         artifacts:
           - frontend/coverage/**
           - frontend/test-reports/**
