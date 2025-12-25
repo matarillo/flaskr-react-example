@@ -24,3 +24,18 @@ pipelines:                 # More info here: https://confluence.atlassian.com/bi
   pull-requests:
     '**':
       - step: *build-test-sonarcloud
+  custom:
+    sonar-frontend:
+      - step:
+          name: Vitest frontend
+          script:
+            - cd frontend
+            - npm ci
+            - npm run test -- --run --coverage || touch coverage/testfail
+          artifacts:
+            - frontend/coverage/**
+      - step:
+          name: SonarQube frontend
+          script:
+            - cd frontend
+            - npx -y -p @sonar/scan sonar -Dsonar.token=$SONAR_TOKEN_FRONT -Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend -Dsonar.organization=matarillo-bitbucket
