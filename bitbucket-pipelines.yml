@@ -28,14 +28,11 @@ pipelines:                 # More info here: https://confluence.atlassian.com/bi
     sonar-frontend:
       - step:
           name: Vitest frontend
+          image: node:22-bookworm
           script:
             - cd frontend
             - npm ci
             - npm run test -- --run --coverage || touch coverage/testfail
+            - npx -y -p @sonar/scan sonar -Dsonar.token=$SONAR_TOKEN_FRONT -Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend -Dsonar.organization=matarillo-bitbucket
           artifacts:
             - frontend/coverage/**
-      - step:
-          name: SonarQube frontend
-          script:
-            - cd frontend
-            - npx -y -p @sonar/scan sonar -Dsonar.token=$SONAR_TOKEN_FRONT -Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend -Dsonar.organization=matarillo-bitbucket
