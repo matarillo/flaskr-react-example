@@ -2,6 +2,9 @@ clone:
   depth: full
 
 definitions:
+  services:
+    docker:
+      memory: 2048
   caches:
     sonar: ~/.sonar/cache
   steps:
@@ -18,6 +21,7 @@ definitions:
     - step: &sonar-frontend
         name: Build, test and analyze on SonarQube Cloud
         image: node:22
+        size: 2x
         caches:
           - node
           - sonar
