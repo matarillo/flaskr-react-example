@@ -1,7 +1,8 @@
 // contexts/auth.tsx
 import { createContext, useContext, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authApi, type LoginRequest } from '../api/auth'
+import { authApi } from '../api/auth'
+import type { AuthRequest } from '../types/auth'
 
 type User = {
   userId: number
@@ -12,7 +13,8 @@ type AuthContextType = {
   user: User | null
   isLoading: boolean
   refetch: () => void
-  login: (credentials: LoginRequest) => Promise<void>
+  register: (credentials: AuthRequest) => Promise<void>
+  login: (credentials: AuthRequest) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -64,7 +66,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   })
 
-  const login = async (credentials: LoginRequest) => {
+  const register = async (credentials: AuthRequest) => {
+    // Register API を呼び出す
+    await authApi.register(credentials)
+    // 成功したら続けて Login API を呼び出す
+    await loginMutation.mutateAsync(credentials)
+  }
+
+  const login = async (credentials: AuthRequest) => {
     await loginMutation.mutateAsync(credentials)
   }
 
@@ -78,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: data ?? null,
         isLoading,
         refetch,
+        register,
         login,
         logout,
       }}

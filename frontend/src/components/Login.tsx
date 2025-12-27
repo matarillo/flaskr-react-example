@@ -28,9 +28,8 @@ function Login() {
       <header>
         <h1>Log In</h1>
       </header>
-
+      { error && <div className="flash">{error}</div> }
       <form onSubmit={handleSubmit}>
-        {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
         <label htmlFor="username">Username</label>
         <input
           name="username"
