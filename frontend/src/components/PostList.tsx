@@ -1,20 +1,7 @@
 import React from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import axios from 'axios'
-import type { PostResponse } from '../data/post'
-
-interface FetchPostsParams {
-  page: number;
-  size: number;
-}
-
-const fetchPosts = async ({ page, size }: FetchPostsParams): Promise<PostResponse> => {
-  const { data } = await axios.get('/api/posts', {
-    params: { page, size }
-  });
-  return data;
-}
+import { postsApi } from '../api/posts'
 
 function PostList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,7 +11,7 @@ function PostList() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['posts', page, size],
-    queryFn: () => fetchPosts({ page, size }),
+    queryFn: () => postsApi.fetchPosts({ page, size }),
   });
 
   if (isLoading) return <div>Loading...</div>;
