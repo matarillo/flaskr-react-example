@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { PostResponse } from '../data/post'
+import type { PostResponse } from '../types/post'
 
 export interface FetchPostsParams {
   page: number

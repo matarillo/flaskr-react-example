@@ -1,15 +1,5 @@
 import axios from 'axios'
-
-export type AuthResponse = {
-  success: boolean
-  userId: number
-  username: string
-}
-
-export type LoginRequest = {
-  username: string
-  password: string
-}
+import type { AuthResponse, LoginRequest } from '../types/auth'
 
 const api = axios.create({
   baseURL: '/api/auth',
