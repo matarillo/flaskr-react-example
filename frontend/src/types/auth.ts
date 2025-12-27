@@ -9,3 +9,8 @@ export type AuthResponse = {
   userId: number
   username: string
 }
+
+export type User = {
+  userId: number
+  username: string
+}

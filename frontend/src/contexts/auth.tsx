@@ -2,12 +2,7 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authApi } from '../api/auth'
-import type { AuthRequest } from '../types/auth'
-
-type User = {
-  userId: number
-  username: string
-}
+import type { AuthRequest, User } from '../types/auth'
 
 type AuthContextType = {
   user: User | null
