@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AuthResponse, LoginRequest } from '../types/auth'
+import type { AuthResponse, AuthRequest } from '../types/auth'
 
 const api = axios.create({
   baseURL: '/api/auth',
@@ -7,7 +7,12 @@ const api = axios.create({
 })
 
 export const authApi = {
-  login: async (credentials: LoginRequest): Promise<AuthResponse> => {
+  register: async (credentials: AuthRequest): Promise<AuthResponse> => {
+    const { data } = await api.post<AuthResponse>('/register', credentials)
+    return data
+  },
+
+  login: async (credentials: AuthRequest): Promise<AuthResponse> => {
     const { data } = await api.post<AuthResponse>('/login', credentials)
     return data
   },
