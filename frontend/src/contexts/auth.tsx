@@ -49,6 +49,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userId: response.userId,
           username: response.username,
         })
+        // 認証状態に依存するクエリを無効化して再フェッチ
+        queryClient.invalidateQueries({ queryKey: ['posts'] })
       }
     },
   })
@@ -57,6 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: authApi.logout,
     onSuccess: () => {
       queryClient.setQueryData(['currentUser'], null)
+      // 認証状態に依存するクエリを無効化して再フェッチ
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
     },
   })
 
