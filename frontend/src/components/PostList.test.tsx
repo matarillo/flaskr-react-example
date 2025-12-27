@@ -1,11 +1,12 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { BrowserRouter } from 'react-router'
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
-
+import { AuthProvider } from '../contexts/auth'
 import PostList from './PostList.tsx'
-import type { Post, PostResponse } from '../data/post.ts'
+import type { Post, PostResponse } from '../types/post.ts'
 
 // 1. MSWのサーバー設定: APIのモック
 const posts: Post[] = [
@@ -26,6 +27,9 @@ const postResponse: PostResponse = {
 const server = setupServer(
   http.get('/api/posts', () => {
     return HttpResponse.json(postResponse);
+  }),
+  http.get('/api/auth/current', () => {
+    return HttpResponse.json({ success: false, message: 'Not authenticated' }, { status: 401 })
   })
 );
 
@@ -34,22 +38,29 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 // 2. テスト用のラッパー作成
-const createTestQueryClient = () => 
+const createTestQueryClient = () =>
   new QueryClient({
     defaultOptions: {
       queries: { retry: false }, // テスト失敗時に何度もリトライしないようにする
     },
   });
 
+const renderWithProviders = (ui: React.ReactElement) => {
+  const queryClient = createTestQueryClient()
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <BrowserRouter>
+          {ui}
+        </BrowserRouter>
+      </AuthProvider>
+    </QueryClientProvider>
+  )
+}
+
 describe('PostList Component', () => {
   it('APIから取得した記事一覧が表示されること', async () => {
-    const queryClient = createTestQueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <PostList />
-      </QueryClientProvider>
-    );
+    renderWithProviders(<PostList />);
 
     // 最初はローディングが表示される
     expect(screen.getByText(/Loading.../i)).toBeInTheDocument();
@@ -69,13 +80,7 @@ describe('PostList Component', () => {
       })
     );
 
-    const queryClient = createTestQueryClient();
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <PostList />
-      </QueryClientProvider>
-    );
+    renderWithProviders(<PostList />);
 
     await waitFor(() => {
       expect(screen.getByText(/Error fetching posts/i)).toBeInTheDocument();
