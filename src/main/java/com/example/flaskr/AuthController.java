@@ -78,20 +78,24 @@ public class AuthController {
                 );
             
             Authentication authentication = authenticationManager.authenticate(authRequest);
-            
+
             // セキュリティコンテキストに認証情報を設定
             SecurityContext context = securityContextHolderStrategy.createEmptyContext();
             context.setAuthentication(authentication);
             securityContextHolderStrategy.setContext(context);
-            
+
             // セッションに保存
             securityContextRepository.saveContext(context, httpRequest, httpResponse);
-            
+
+            // CustomUserDetailsからuserIdを取得
+            CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Login successful");
             response.put("username", authentication.getName());
-            
+            response.put("userId", userDetails.getUserId());
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
