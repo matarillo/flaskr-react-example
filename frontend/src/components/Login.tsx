@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/auth'
+import { isAxiosError } from 'axios'
+import type { AuthErrorResponse } from '../types/auth'
 import './Login.css'
 
 function Login() {
@@ -18,7 +20,11 @@ function Login() {
       await login({ username, password })
       navigate('/')
     } catch (err) {
-      setError('Login failed. Please check your credentials.')
+      if (isAxiosError<AuthErrorResponse>(err) && err.response?.data?.message) {
+        setError(err.response.data.message)
+      } else {
+        setError('Login failed. Please check your credentials.')
+      }
     }
   }
 

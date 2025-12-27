@@ -14,3 +14,8 @@ export type User = {
   userId: number
   username: string
 }
+
+export type AuthErrorResponse = {
+  success: boolean
+  message: string
+}

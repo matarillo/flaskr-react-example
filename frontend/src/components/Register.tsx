@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../contexts/auth'
+import { isAxiosError } from 'axios'
+import type { AuthErrorResponse } from '../types/auth'
 
 function Register() {
   const [username, setUsername] = useState('')
@@ -17,7 +19,11 @@ function Register() {
       await register({ username, password })
       navigate('/')
     } catch (err) {
-      setError('Registration failed. Please try again.')
+      if (isAxiosError<AuthErrorResponse>(err) && err.response?.data?.message) {
+        setError(err.response.data.message)
+      } else {
+        setError('Registration failed. Please try again.')
+      }
     }
   }
 
