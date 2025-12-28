@@ -26,6 +26,14 @@ function Update() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: postApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['posts'] })
+      navigate('/')
+    },
+  })
+
   const errorMessage = updateMutation.error
     ? (isAxiosError<PostErrorResponse>(updateMutation.error) && updateMutation.error.response?.data?.message) || '投稿の更新に失敗しました'
     : null
@@ -39,6 +47,14 @@ function Update() {
       title: formData.get('title') as string,
       body: formData.get('body') as string,
     })
+  }
+
+  const handleDelete = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!id) return
+    if (window.confirm('本当に削除しますか？')) {
+      deleteMutation.mutate({ id: Number(id) })
+    }
   }
 
   const renderLayout = (content: ReactNode) => (
@@ -80,8 +96,8 @@ function Update() {
         <input type="submit" value="Save" disabled={updateMutation.isPending} />
       </form>
       <hr />
-      <form method="post">
-        <input className="danger" type="submit" value="Delete" disabled />
+      <form method="post" onSubmit={handleDelete}>
+        <input className="danger" type="submit" value="Delete" disabled={deleteMutation.isPending} />
       </form>
     </>
   )

@@ -27,7 +27,7 @@ function PostList() {
                 <h1>{ post.title }</h1>
                 <div className="about">by { post.author.username } on { post.created }</div>
               </div>
-              { post.updateUrl != null && <Link to={`/posts/${post.id}/update`}>Edit</Link> }
+              { post.updateUrl != null && <Link to={`/posts/${post.id}/update`} className='action'>Edit</Link> }
             </header>
             <p className="body">{ post.body }</p>
           </article>
