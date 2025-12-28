@@ -7,7 +7,7 @@ import type { PostErrorResponse } from '../types/post'
 import { useAuth } from '../contexts/auth'
 
 function Update() {
-  const { user } = useAuth()
+  const { user, isLoading: isAuthLoading } = useAuth()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
@@ -69,6 +69,12 @@ function Update() {
     </>
   )
 
+  // 認証状態の読み込み中は待機
+  if (isAuthLoading) {
+    return renderLayout(<div className="flash">認証確認中...</div>)
+  }
+
+  // 認証されていない場合のみリダイレクト
   if (!user) return <Navigate to="/" replace />
 
   if (isLoading) {
