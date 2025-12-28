@@ -1,30 +1,33 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { useAuth } from '../contexts/auth'
+import { useMutation } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
+import { authApi } from '../api/auth'
+import { useAuth } from '../contexts/auth'
 import type { AuthErrorResponse } from '../types/auth'
 
 function Register() {
+  const navigate = useNavigate()
+  const { login } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const { register } = useAuth()
-  const navigate = useNavigate()
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
-
-    try {
-      await register({ username, password })
+  const registerMutation = useMutation({
+    mutationFn: authApi.register,
+    onSuccess: async () => {
+      // 登録成功後に自動ログイン
+      await login({ username, password })
       navigate('/')
-    } catch (err) {
-      if (isAxiosError<AuthErrorResponse>(err) && err.response?.data?.message) {
-        setError(err.response.data.message)
-      } else {
-        setError('Registration failed. Please try again.')
-      }
-    }
+    },
+  })
+
+  const errorMessage = registerMutation.error
+    ? (isAxiosError<AuthErrorResponse>(registerMutation.error) && registerMutation.error.response?.data?.message) || 'Registration failed. Please try again.'
+    : null
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    registerMutation.mutate({ username, password })
   }
 
   return (
@@ -33,7 +36,8 @@ function Register() {
       <header>
         <h1>Register</h1>
       </header>
-      { error && <div className="flash">{error}</div> }
+      {registerMutation.isPending && <div className="flash">登録中...</div>}
+      {errorMessage && <div className="flash">{errorMessage}</div>}
       <form onSubmit={handleSubmit}>
         <label htmlFor="username">Username</label>
         <input
@@ -52,7 +56,7 @@ function Register() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
-        <input type="submit" value="Register" />
+        <input type="submit" value="Register" disabled={registerMutation.isPending} />
       </form>
     </>
   );

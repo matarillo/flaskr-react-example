@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
-import { postsApi } from '../api/post'
+import { postApi } from '../api/post'
 import type { PostErrorResponse } from '../types/post'
 
 function Create() {
@@ -12,7 +12,7 @@ function Create() {
   const [body, setBody] = useState('')
 
   const createMutation = useMutation({
-    mutationFn: postsApi.create,
+    mutationFn: postApi.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['posts'] })
       navigate('/')

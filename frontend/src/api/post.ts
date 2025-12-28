@@ -1,9 +1,11 @@
 import axios from 'axios'
 import type {
-  FetchPostsRequest,
-  FetchPostsResponse,
+  ListPostsRequest,
+  ListPostsResponse,
   CreatePostRequest,
   CreatePostResponse,
+  FindPostRequest,
+  FindPostResponse,
   UpdatePostRequest,
   UpdatePostResponse,
   DeletePostRequest,
@@ -15,9 +17,9 @@ const api = axios.create({
   withCredentials: true,
 })
 
-export const postsApi = {
-  fetchPosts: async ({ page, size }: FetchPostsRequest): Promise<FetchPostsResponse> => {
-    const { data } = await api.get<FetchPostsResponse>('', {
+export const postApi = {
+  list: async ({ page, size }: ListPostsRequest): Promise<ListPostsResponse> => {
+    const { data } = await api.get<ListPostsResponse>('', {
       params: { page, size }
     })
     return data
@@ -25,6 +27,11 @@ export const postsApi = {
 
   create: async ({ title, body }: CreatePostRequest): Promise<CreatePostResponse> => {
     const { data } = await api.post<CreatePostResponse>('', { title, body })
+    return data
+  },
+
+  find: async( { id }: FindPostRequest): Promise<FindPostResponse> => {
+    const { data } = await api.get<FindPostResponse>(`/${id}`)
     return data
   },
 

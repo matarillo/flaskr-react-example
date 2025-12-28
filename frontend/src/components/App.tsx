@@ -6,6 +6,7 @@ import Home from './Home'
 import Login from './Login'
 import Register from './Register'
 import Create from './Create'
+import Update from './Update'
 import './App.css'
 
 const queryClient = new QueryClient()
@@ -21,6 +22,7 @@ function App() {
               <Route path="login" element={<Login />} />
               <Route path="register" element={<Register />} />
               <Route path="create" element={<Create />} />
+              <Route path="posts/:id/update" element={<Update />} />
             </Route>
           </Routes>
         </BrowserRouter>

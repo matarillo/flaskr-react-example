@@ -1,7 +1,7 @@
 import React from 'react'
-import { useSearchParams } from 'react-router'
+import { useSearchParams, Link } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { postsApi } from '../api/post'
+import { postApi } from '../api/post'
 
 function PostList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -11,7 +11,7 @@ function PostList() {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['posts', page, size],
-    queryFn: () => postsApi.fetchPosts({ page, size }),
+    queryFn: () => postApi.list({ page, size }),
   });
 
   if (isLoading) return <div>Loading...</div>;
@@ -27,7 +27,7 @@ function PostList() {
                 <h1>{ post.title }</h1>
                 <div className="about">by { post.author.username } on { post.created }</div>
               </div>
-              { post.updateUrl != null && <a href="#">Edit</a> }
+              { post.updateUrl != null && <Link to={`/posts/${post.id}/update`}>Edit</Link> }
             </header>
             <p className="body">{ post.body }</p>
           </article>

@@ -16,7 +16,7 @@ export type PostWithActions = Post & {
 }
 
 // API request types
-export type FetchPostsRequest = {
+export type ListPostsRequest = {
   page: number
   size: number
 }
@@ -24,6 +24,10 @@ export type FetchPostsRequest = {
 export type CreatePostRequest = {
   title: string
   body: string
+}
+
+export type FindPostRequest = {
+  id: number
 }
 
 export type UpdatePostRequest = {
@@ -37,15 +41,7 @@ export type DeletePostRequest = {
 }
 
 // API response types
-export type CreatePostResponse = {
-  success: boolean
-  message: string
-  post: Post
-}
-
-export type UpdatePostResponse = CreatePostResponse
-
-export type FetchPostsResponse = {
+export type ListPostsResponse = {
   success: boolean
   posts: PostWithActions[]
   page: number
@@ -55,6 +51,18 @@ export type FetchPostsResponse = {
   isFirst: boolean
   isLast: boolean
 }
+
+export type CreatePostResponse = Post & {
+  success: boolean
+  message: string
+}
+
+export type FindPostResponse = PostWithActions & {
+  success: boolean
+  message: string
+}
+
+export type UpdatePostResponse = CreatePostResponse
 
 export type DeletePostResponse = {
   success: boolean
