@@ -6,14 +6,14 @@ import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 import { AuthProvider } from '../contexts/auth'
 import PostList from './PostList.tsx'
-import type { Post, PostsResponse } from '../types/post.ts'
+import type { Post, FetchPostsResponse } from '../types/post.ts'
 
 // 1. MSWのサーバー設定: APIのモック
 const posts: Post[] = [
   { id: 1, title: 'Vitestの基本', body: '', created: '2025-01-01', author: { id: 1, username: 'foo' } },
   { id: 2, title: 'TanStack Queryのテスト', body: '', created: '2025-01-01', author: { id: 2, username: 'bar' } },
 ];
-const PostsResponse: PostsResponse = {
+const mockFetchPostsResponse: FetchPostsResponse = {
   success: true,
   posts: posts,
   page: 0,
@@ -26,7 +26,7 @@ const PostsResponse: PostsResponse = {
 
 const server = setupServer(
   http.get('/api/posts', () => {
-    return HttpResponse.json(PostsResponse);
+    return HttpResponse.json(mockFetchPostsResponse);
   }),
   http.get('/api/auth/current', () => {
     return HttpResponse.json({ success: false, message: 'Not authenticated' }, { status: 401 })

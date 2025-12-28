@@ -1,7 +1,7 @@
 import React from 'react'
 import { useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
-import { postsApi } from '../api/posts'
+import { postsApi } from '../api/post'
 
 function PostList() {
   const [searchParams, setSearchParams] = useSearchParams();

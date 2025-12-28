@@ -1,26 +1,53 @@
+// Domain types
 export type Post = {
-  id: number;
-  title: string;
-  body: string;
-  created: string;
+  id: number
+  title: string
+  body: string
+  created: string
   author: {
-    id: number;
-    username: string;
-  };
+    id: number
+    username: string
+  }
 }
 
-export type PostResponse = Post & {
-  success: boolean;
-  message: string;
+export type PostWithActions = Post & {
+  updateUrl?: string
+  deleteUrl?: string
 }
 
-export type PostsResponse = {
-  success: boolean;
-  posts: (Post & { updateUrl?: string; deleteUrl?: string; })[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-  isFirst: boolean;
-  isLast: boolean;
+// API request types
+export type FetchPostsRequest = {
+  page: number
+  size: number
+}
+
+export type CreatePostRequest = {
+  title: string
+  body: string
+}
+
+export type UpdatePostRequest = {
+  id: number
+  title: string
+  body: string
+}
+
+// API response types
+export type CreatePostResponse = {
+  success: boolean
+  message: string
+  post: Post
+}
+
+export type UpdatePostResponse = CreatePostResponse
+
+export type FetchPostsResponse = {
+  success: boolean
+  posts: PostWithActions[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  isFirst: boolean
+  isLast: boolean
 }
