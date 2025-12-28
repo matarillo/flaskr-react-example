@@ -9,8 +9,8 @@ import type { AuthErrorResponse } from '../types/auth'
 function Register() {
   const navigate = useNavigate()
   const { login } = useAuth()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('') // loginに渡すため、FormDataを使わない
+  const [password, setPassword] = useState('') // loginに渡すため、FormDataを使わない
 
   const registerMutation = useMutation({
     mutationFn: authApi.register,

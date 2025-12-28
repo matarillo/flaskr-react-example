@@ -1,11 +1,13 @@
 import { type FormEvent, type ReactNode } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import { postApi } from '../api/post'
 import type { PostErrorResponse } from '../types/post'
+import { useAuth } from '../contexts/auth'
 
 function Update() {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
@@ -66,6 +68,8 @@ function Update() {
       {content}
     </>
   )
+
+  if (!user) return <Navigate to="/" replace />
 
   if (isLoading) {
     return renderLayout(<div className="flash">読み込み中...</div>)

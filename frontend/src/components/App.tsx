@@ -16,6 +16,28 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <BrowserRouter>
+          {/*
+            認証チェック実装メモ:
+            現在: <Navigate>コンポーネントで各ページ内でチェック (Create.tsx, Update.tsx)
+
+            将来的な改善案 (セキュリティ・UX向上のため):
+            1. createBrowserRouter + loader による事前チェックを追加
+            2. コンポーネントレンダリング前にリダイレクト (フラッシュ防止)
+            3. React Query キャッシュとの統合
+
+            実装例:
+            const protectedLoader = async () => {
+              const user = await queryClient.fetchQuery({
+                queryKey: ['currentUser'],
+                queryFn: authQueryFn,
+                staleTime: 5 * 60 * 1000,
+              })
+              if (!user) throw redirect('/')
+              return null
+            }
+
+            参考: https://reactrouter.com/en/main/route/loader
+          */}
           <Routes>
             <Route path="/" element={<Layout />}>
               <Route index element={<Home />} />

@@ -1,31 +1,33 @@
-import { useState, type FormEvent } from 'react'
+import { type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
+import { useMutation } from '@tanstack/react-query'
 import { useAuth } from '../contexts/auth'
 import { isAxiosError } from 'axios'
 import type { AuthErrorResponse } from '../types/auth'
 import './Login.css'
 
 function Login() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    setError(null)
-
-    try {
-      await login({ username, password })
+  const loginMutation = useMutation({
+    mutationFn: login,
+    onSuccess: () => {
       navigate('/')
-    } catch (err) {
-      if (isAxiosError<AuthErrorResponse>(err) && err.response?.data?.message) {
-        setError(err.response.data.message)
-      } else {
-        setError('Login failed. Please check your credentials.')
-      }
-    }
+    },
+  })
+
+  const errorMessage = loginMutation.error
+    ? (isAxiosError<AuthErrorResponse>(loginMutation.error) && loginMutation.error.response?.data?.message) || 'Login failed. Please check your credentials.'
+    : null
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    loginMutation.mutate({
+      username: formData.get('username') as string,
+      password: formData.get('password') as string,
+    })
   }
 
   return (
@@ -34,14 +36,13 @@ function Login() {
       <header>
         <h1>Log In</h1>
       </header>
-      { error && <div className="flash">{error}</div> }
+      {loginMutation.isPending && <div className="flash">ログイン中...</div>}
+      {errorMessage && <div className="flash">{errorMessage}</div>}
       <form onSubmit={handleSubmit}>
         <label htmlFor="username">Username</label>
         <input
           name="username"
           id="username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
           required
         />
         <label htmlFor="password">Password</label>
@@ -49,11 +50,9 @@ function Login() {
           type="password"
           name="password"
           id="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
           required
         />
-        <input type="submit" value="Log In" />
+        <input type="submit" value="Log In" disabled={loginMutation.isPending} />
       </form>
     </>
   )
