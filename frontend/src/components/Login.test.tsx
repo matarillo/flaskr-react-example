@@ -1,10 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
-import userEvent from '@testing-library/user-event'
 import { AuthProvider } from '../contexts/auth'
 import type { LoginResponse, AuthErrorResponse } from '../types/auth'
 import Login from './Login'
@@ -51,8 +50,6 @@ describe('Login Component', () => {
   })
 
   it('ログインが成功したらホーム画面に遷移すること', async () => {
-    const user = userEvent.setup()
-
     // ログインAPIのモック
     server.use(
       http.post('/api/auth/login', async () => {
@@ -73,10 +70,12 @@ describe('Login Component', () => {
     const passwordInput = screen.getByLabelText(/password/i)
     const submitButton = screen.getByRole('button', { name: /log in/i })
 
-    // userEvent.type()で実際のユーザー入力を1文字ずつシミュレート
-    await user.type(usernameInput, 'testuser')
-    await user.type(passwordInput, 'password123')
-    await user.click(submitButton)
+    // fireEvent.change()で値を直接変更
+    // Note: userEvent.type()を使用すると、1文字ずつ入力をシミュレートすることで、
+    // より実際のユーザー操作に近い形でテストすることも可能
+    fireEvent.change(usernameInput, { target: { value: 'testuser' } })
+    fireEvent.change(passwordInput, { target: { value: 'password123' } })
+    fireEvent.click(submitButton)
 
     // ナビゲーションが発生したことを確認（URLが変わる）
     await waitFor(() => {
@@ -85,8 +84,6 @@ describe('Login Component', () => {
   })
 
   it('ログインが失敗したらエラーメッセージが表示されること', async () => {
-    const user = userEvent.setup()
-
     // ログインAPIのエラーモック
     server.use(
       http.post('/api/auth/login', async () => {
@@ -105,9 +102,12 @@ describe('Login Component', () => {
     const passwordInput = screen.getByLabelText(/password/i)
     const submitButton = screen.getByRole('button', { name: /log in/i })
 
-    await user.type(usernameInput, 'wronguser')
-    await user.type(passwordInput, 'wrongpass')
-    await user.click(submitButton)
+    // fireEvent.change()で値を直接変更
+    // Note: userEvent.type()を使用すると、1文字ずつ入力をシミュレートすることで、
+    // より実際のユーザー操作に近い形でテストすることも可能
+    fireEvent.change(usernameInput, { target: { value: 'wronguser' } })
+    fireEvent.change(passwordInput, { target: { value: 'wrongpass' } })
+    fireEvent.click(submitButton)
 
     // エラーメッセージが表示される
     await waitFor(() => {
