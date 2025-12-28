@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { useAuth } from "../contexts/auth";
 import PostList from "./PostList";
 
@@ -9,7 +10,7 @@ function Home() {
       <title>Posts - Flaskr</title>
       <header>
         <h1>Posts</h1>
-        {user && <a className="action" href="/create">New</a>}
+        {user && <Link className="action" to="/create">New</Link>}
       </header>
       <PostList />
     </>
