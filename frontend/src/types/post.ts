@@ -7,13 +7,16 @@ export type Post = {
     id: number;
     username: string;
   };
-  updateUrl?: string;
-  deleteUrl?: string;
 }
 
-export type PostResponse = {
+export type PostResponse = Post & {
   success: boolean;
-  posts: Post[];
+  message: string;
+}
+
+export type PostsResponse = {
+  success: boolean;
+  posts: (Post & { updateUrl?: string; deleteUrl?: string; })[];
   page: number;
   size: number;
   totalElements: number;
