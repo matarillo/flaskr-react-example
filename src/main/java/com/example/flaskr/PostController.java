@@ -133,6 +133,7 @@ public class PostController {
         }
     }
 
+    @GetMapping("/{id}")
     public ResponseEntity<Map<String, Object>> find(@PathVariable Integer id) {
         // 現在ログインしているユーザーを取得
         Integer currentUserId = getCurrentUserId();
