@@ -32,6 +32,10 @@ export type UpdatePostRequest = {
   body: string
 }
 
+export type DeletePostRequest = {
+  id: number
+}
+
 // API response types
 export type CreatePostResponse = {
   success: boolean
@@ -50,4 +54,15 @@ export type FetchPostsResponse = {
   totalPages: number
   isFirst: boolean
   isLast: boolean
+}
+
+export type DeletePostResponse = {
+  success: boolean
+  message: string
+  postId: number
+}
+
+export type PostErrorResponse = {
+  success: boolean
+  message: string
 }

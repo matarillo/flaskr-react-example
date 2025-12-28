@@ -6,7 +6,7 @@ import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 import userEvent from '@testing-library/user-event'
 import { AuthProvider } from '../contexts/auth'
-import type { AuthResponse, AuthErrorResponse } from '../types/auth'
+import type { LoginResponse, AuthErrorResponse } from '../types/auth'
 import Login from './Login'
 
 // MSWサーバーのセットアップ
@@ -56,7 +56,7 @@ describe('Login Component', () => {
     // ログインAPIのモック
     server.use(
       http.post('/api/auth/login', async () => {
-        const response: AuthResponse = {
+        const response: LoginResponse = {
           success: true,
           message: 'Login successful',
           userId: 1,
@@ -73,6 +73,7 @@ describe('Login Component', () => {
     const passwordInput = screen.getByLabelText(/password/i)
     const submitButton = screen.getByRole('button', { name: /log in/i })
 
+    // userEvent.type()で実際のユーザー入力を1文字ずつシミュレート
     await user.type(usernameInput, 'testuser')
     await user.type(passwordInput, 'password123')
     await user.click(submitButton)

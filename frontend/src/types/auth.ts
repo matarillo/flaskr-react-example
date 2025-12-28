@@ -17,6 +17,11 @@ export type LoginResponse = {
   username: string
 }
 
+export type AuthErrorResponse = {
+  success: false
+  message: string
+}
+
 export type RegisterResponse = LoginResponse
 
 export type GetCurrentUserResponse = LoginResponse

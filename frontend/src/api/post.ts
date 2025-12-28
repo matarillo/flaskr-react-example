@@ -5,7 +5,9 @@ import type {
   CreatePostRequest,
   CreatePostResponse,
   UpdatePostRequest,
-  UpdatePostResponse
+  UpdatePostResponse,
+  DeletePostRequest,
+  DeletePostResponse
 } from '../types/post'
 
 const api = axios.create({
@@ -29,5 +31,10 @@ export const postsApi = {
   update: async ({ id, title, body }: UpdatePostRequest): Promise<UpdatePostResponse> => {
     const { data } = await api.post<UpdatePostResponse>(`/${id}/update`, { title, body })
     return data
-  }
+  },
+
+  delete: async ({ id }: DeletePostRequest): Promise<DeletePostResponse> => {
+    const { data } = await api.post<DeletePostResponse>(`/${id}/delete`)
+    return data
+  },
 }
