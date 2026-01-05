@@ -1,6 +1,7 @@
 import { type FormEvent, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import useSWR from 'swr'
+import useSWRMutation from 'swr/mutation'
 import { isAxiosError } from 'axios'
 import { postApi } from '../api/post'
 import type { PostErrorResponse } from '../types/post'
@@ -10,54 +11,6 @@ function Update() {
   const { user, isLoading: isAuthLoading } = useAuth()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const queryClient = useQueryClient()
-
-  // 個別の投稿を取得
-  const { data: post, isLoading } = useQuery({
-    queryKey: ['post', id],
-    queryFn: () => postApi.find({ id: Number(id!) }),
-    enabled: !!id,
-  })
-
-  const updateMutation = useMutation({
-    mutationFn: postApi.update,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] })
-      queryClient.invalidateQueries({ queryKey: ['post', id] })
-      navigate('/')
-    },
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: postApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] })
-      navigate('/')
-    },
-  })
-
-  const errorMessage = updateMutation.error
-    ? (isAxiosError<PostErrorResponse>(updateMutation.error) && updateMutation.error.response?.data?.message) || '投稿の更新に失敗しました'
-    : null
-
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!id) return
-    const formData = new FormData(e.currentTarget)
-    updateMutation.mutate({
-      id: Number(id),
-      title: formData.get('title') as string,
-      body: formData.get('body') as string,
-    })
-  }
-
-  const handleDelete = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!id) return
-    if (window.confirm('本当に削除しますか？')) {
-      deleteMutation.mutate({ id: Number(id) })
-    }
-  }
 
   const renderLayout = (content: ReactNode) => (
     <>
@@ -68,6 +21,70 @@ function Update() {
       {content}
     </>
   )
+
+  // Hooks must be called before any conditional returns
+  // 個別の投稿を取得
+  const { data: post, isLoading } = useSWR(
+    id ? `posts/${id}` : null,
+    id ? () => postApi.find({ id: Number(id) }) : null
+  )
+
+  const { trigger: updateTrigger, isMutating: isUpdating, error: updateError } = useSWRMutation(
+    id ? `posts/${id}` : null,
+    async (_, { arg }: { arg: { title: string; body: string } }) => {
+      if (!id) return
+      await postApi.update({ id: Number(id), ...arg })
+    },
+    {
+      onSuccess: () => {
+        navigate('/')
+      },
+    }
+  )
+
+  const { trigger: deleteTrigger, isMutating: isDeleting, error: deleteError } = useSWRMutation(
+    id ? `posts/${id}` : null,
+    async () => {
+      if (!id) return
+      await postApi.delete({ id: Number(id) })
+    },
+    {
+      onSuccess: () => {
+        // 削除成功時は画面遷移のみ行い、リフェッチはHomeコンポーネントで行われる
+        navigate('/')
+      },
+      // 削除成功時は自動リフェッチを無効化（リソースが存在しないため）
+      revalidate: false,
+    }
+  )
+
+  // IDが存在しない場合は早期リターン（全てのHooksの後）
+  if (!id) {
+    return renderLayout(<div className="flash">無効なURLです</div>)
+  }
+
+  const error = updateError || deleteError
+  const errorMessage = error
+    ? (isAxiosError<PostErrorResponse>(error) && error.response?.data?.message) || '投稿の更新に失敗しました'
+    : null
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!id) return
+    const formData = new FormData(e.currentTarget)
+    await updateTrigger({
+      title: formData.get('title') as string,
+      body: formData.get('body') as string,
+    })
+  }
+
+  const handleDelete = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!id) return
+    if (window.confirm('本当に削除しますか？')) {
+      await deleteTrigger()
+    }
+  }
 
   // 認証状態の読み込み中は待機
   if (isAuthLoading) {
@@ -87,7 +104,7 @@ function Update() {
 
   return renderLayout(
     <>
-      {updateMutation.isPending && <div className="flash">送信中...</div>}
+      {(isUpdating || isDeleting) && <div className="flash">送信中...</div>}
       {errorMessage && <div className="flash">{errorMessage}</div>}
       <form method="post" onSubmit={handleSubmit}>
         <label htmlFor="title">Title</label>
@@ -103,11 +120,11 @@ function Update() {
           id="body"
           defaultValue={post.body}
         ></textarea>
-        <input type="submit" value="Save" disabled={updateMutation.isPending} />
+        <input type="submit" value="Save" disabled={isUpdating || isDeleting} />
       </form>
       <hr />
       <form method="post" onSubmit={handleDelete}>
-        <input className="danger" type="submit" value="Delete" disabled={deleteMutation.isPending} />
+        <input className="danger" type="submit" value="Delete" disabled={isUpdating || isDeleting} />
       </form>
     </>
   )

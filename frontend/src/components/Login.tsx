@@ -1,33 +1,28 @@
 import { type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { useMutation } from '@tanstack/react-query'
 import { useAuth } from '../contexts/auth'
 import { isAxiosError } from 'axios'
 import type { AuthErrorResponse } from '../types/auth'
 import './Login.css'
 
 function Login() {
-  const { login } = useAuth()
+  const { login, isMutating, error } = useAuth()
   const navigate = useNavigate()
 
-  const loginMutation = useMutation({
-    mutationFn: login,
-    onSuccess: () => {
-      navigate('/')
-    },
-  })
-
-  const errorMessage = loginMutation.error
-    ? (isAxiosError<AuthErrorResponse>(loginMutation.error) && loginMutation.error.response?.data?.message) || 'Login failed. Please check your credentials.'
+  const errorMessage = error
+    ? (isAxiosError<AuthErrorResponse>(error) && error.response?.data?.message) || 'Login failed. Please check your credentials.'
     : null
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    loginMutation.mutate({
+    const result = await login({
       username: formData.get('username') as string,
       password: formData.get('password') as string,
     })
+    if (result) {
+      navigate('/')
+    }
   }
 
   return (
@@ -36,7 +31,7 @@ function Login() {
       <header>
         <h1>Log In</h1>
       </header>
-      {loginMutation.isPending && <div className="flash">ログイン中...</div>}
+      {isMutating && <div className="flash">ログイン中...</div>}
       {errorMessage && <div className="flash">{errorMessage}</div>}
       <form onSubmit={handleSubmit}>
         <label htmlFor="username">Username</label>
@@ -52,7 +47,7 @@ function Login() {
           id="password"
           required
         />
-        <input type="submit" value="Log In" disabled={loginMutation.isPending} />
+        <input type="submit" value="Log In" disabled={isMutating} />
       </form>
     </>
   )

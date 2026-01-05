@@ -2,7 +2,7 @@ import { Link, Outlet } from "react-router";
 import { useAuth } from '../contexts/auth'
 
 function Layout() {
-  const { user, logout } = useAuth()
+  const { user, logout, isMutating } = useAuth()
 
   return (
     <>
@@ -13,9 +13,15 @@ function Layout() {
             <>
               <li><span>{user.username}</span></li>
               <li>
-                <a href="#" onClick={(e) => { e.preventDefault(); logout(); }}>
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  disabled={isMutating}
+                  className="anchor"
+                  style={{ cursor: isMutating ? 'not-allowed' : 'pointer' }}
+                >
                   Log Out
-                </a>
+                </button>
               </li>
             </>
           ) : (

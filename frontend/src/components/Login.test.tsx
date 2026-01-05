@@ -1,6 +1,6 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react'
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { SWRConfig } from 'swr'
 import { BrowserRouter } from 'react-router'
 import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
@@ -15,32 +15,26 @@ const server = setupServer(
   })
 )
 
-beforeAll(() => server.listen())
-afterEach(() => server.resetHandlers())
-afterAll(() => server.close())
-
-const createTestQueryClient = () => new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: false,
-    },
-  },
-})
-
 const renderWithProviders = (ui: React.ReactElement) => {
-  const queryClient = createTestQueryClient()
   return render(
-    <QueryClientProvider client={queryClient}>
+    <SWRConfig value={{ dedupingInterval: 0, provider: () => new Map() }}>
       <AuthProvider>
         <BrowserRouter>
           {ui}
         </BrowserRouter>
       </AuthProvider>
-    </QueryClientProvider>
+    </SWRConfig>
   )
 }
 
 describe('Login Component', () => {
+  beforeAll(() => server.listen())
+  afterEach(() => {
+    cleanup()
+    server.resetHandlers()
+  })
+  afterAll(() => server.close())
+
   it('ログインフォームが表示されること', () => {
     renderWithProviders(<Login />)
     expect(screen.getByRole('heading', { name: /log in/i })).toBeInTheDocument()

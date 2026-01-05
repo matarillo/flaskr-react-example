@@ -1,90 +1,121 @@
 // contexts/auth.tsx
 import { createContext, useContext, type ReactNode } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import useSWR, { mutate } from 'swr'
+import useSWRMutation from 'swr/mutation'
+import { isAxiosError } from 'axios'
 import { authApi } from '../api/auth'
 import type { LoginRequest, RegisterRequest, User } from '../types/auth'
 
 type AuthContextType = {
   user: User | null
   isLoading: boolean
-  refetch: () => void
-  register: (credentials: RegisterRequest) => Promise<void>
-  login: (credentials: LoginRequest) => Promise<void>
-  logout: () => Promise<void>
+  isMutating: boolean
+  error: Error | null
+  refresh: () => void
+  register: (credentials: RegisterRequest) => Promise<User | null>
+  login: (credentials: LoginRequest) => Promise<User | null>
+  logout: () => Promise<null>
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType>({} as AuthContextType)
+
+const currentUserFetcher = async () => {
+  try {
+    const response = await authApi.getCurrentUser()
+    if (response.success) {
+      return {
+        userId: response.userId,
+        username: response.username,
+      }
+    }
+    return null
+  } catch (error) {
+    // 401 (未認証) の場合は null を返す（ログアウト状態として扱う）
+    if (isAxiosError(error) && error.response?.status === 401) {
+      return null
+    }
+    // その他のエラー（ネットワークエラーなど）は再スロー
+    throw error
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const queryClient = useQueryClient()
+  const { data, isLoading, mutate: refresh } = useSWR<User | null>(
+    'currentUser',
+    currentUserFetcher,
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false
+    }
+  )
 
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: async () => {
-      try {
-        const response = await authApi.getCurrentUser()
-        if (response.success) {
-          return {
-            userId: response.userId,
-            username: response.username,
-          }
-        }
-        return null
-      } catch {
-        return null
+  const {
+    trigger: loginTrigger,
+    isMutating: isLoginMutating,
+    error: loginError
+  } = useSWRMutation(
+    'auth/login',
+    async (_key, { arg }: { arg: LoginRequest }) => {
+      // authApi.login()が401を返した場合、axiosがエラーをスローする
+      // throwOnError: false により、エラーはloginErrorに設定される
+      const response = await authApi.login(arg)
+      const user = {
+        userId: response.userId,
+        username: response.username,
       }
+      // 成功時のみcurrentUserキャッシュを更新
+      await refresh(user, { revalidate: false })
+      // 認証状態に依存するクエリを再検証
+      // 意図的にawaitせず、バックグラウンドで再フェッチ（画面遷移をブロックしない）
+      mutate((key) => typeof key === 'string' && key.startsWith('posts'))
+      return user
     },
-    retry: false,
-    staleTime: 5 * 60 * 1000,
-  })
+    {
+      throwOnError: false,
+      populateCache: false,
+    }
+  )
 
-  const loginMutation = useMutation({
-    mutationFn: authApi.login,
-    onSuccess: (response) => {
-      if (response.success) {
-        queryClient.setQueryData(['currentUser'], {
-          userId: response.userId,
-          username: response.username,
-        })
-        // 認証状態に依存するクエリを無効化して再フェッチ
-        queryClient.invalidateQueries({ queryKey: ['posts'] })
-      }
+  const {
+    trigger: logoutTrigger,
+    isMutating: isLogoutMutating,
+    error: logoutError
+  } = useSWRMutation(
+    'auth/logout',
+    async () => {
+      await authApi.logout()
+      // 成功時のみcurrentUserキャッシュをクリア
+      await refresh(null, { revalidate: false })
+      // 認証状態に依存するクエリを再検証
+      // 意図的にawaitせず、バックグラウンドで再フェッチ（画面遷移をブロックしない）
+      mutate((key) => typeof key === 'string' && key.startsWith('posts'))
+      return null
     },
-  })
-
-  const logoutMutation = useMutation({
-    mutationFn: authApi.logout,
-    onSuccess: () => {
-      queryClient.setQueryData(['currentUser'], null)
-      // 認証状態に依存するクエリを無効化して再フェッチ
-      queryClient.invalidateQueries({ queryKey: ['posts'] })
-    },
-  })
+    {
+      throwOnError: false,
+      populateCache: false,
+    }
+  )
 
   const register = async (credentials: RegisterRequest) => {
-    // Register API を呼び出す
     await authApi.register(credentials)
-    // 成功したら続けて Login API を呼び出す
-    await loginMutation.mutateAsync(credentials)
+    return await loginTrigger(credentials)
   }
 
-  const login = async (credentials: LoginRequest) => {
-    await loginMutation.mutateAsync(credentials)
-  }
-
-  const logout = async () => {
-    await logoutMutation.mutateAsync()
-  }
+  const isMutating = isLoginMutating || isLogoutMutating
+  const error = loginError || logoutError
 
   return (
     <AuthContext.Provider
       value={{
         user: data ?? null,
         isLoading,
-        refetch,
+        isMutating,
+        error,
+        refresh,
         register,
-        login,
-        logout,
+        login: loginTrigger,
+        logout: logoutTrigger,
       }}
     >
       {children}
@@ -94,9 +125,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider')
-  }
-  return context
+  return useContext(AuthContext)
 }

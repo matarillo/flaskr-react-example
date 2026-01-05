@@ -1,6 +1,6 @@
-import React from 'react'
+import { Fragment } from 'react'
 import { useSearchParams, Link } from 'react-router'
-import { useQuery } from '@tanstack/react-query'
+import useSWR from 'swr'
 import { postApi } from '../api/post'
 
 function PostList() {
@@ -9,18 +9,18 @@ function PostList() {
   const page = parseInt(searchParams.get('page') || '0', 10);
   const size = parseInt(searchParams.get('size') || '10', 10);
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['posts', page, size],
-    queryFn: () => postApi.list({ page, size }),
-  });
+  const { data, error, isLoading } = useSWR(
+    `posts?page=${page}&size=${size}`,
+    () => postApi.list({ page, size })
+  );
 
   if (isLoading) return <div>Loading...</div>;
-  if (isError) return <div>Error fetching posts</div>;
+  if (error) return <div>Error fetching posts</div>;
 
   return (
     <>
       {data?.posts.map((post, index) => (
-        <React.Fragment key={post.id}>
+        <Fragment key={post.id}>
           <article className="post">
             <header>
               <div>
@@ -32,7 +32,7 @@ function PostList() {
             <p className="body">{ post.body }</p>
           </article>
           {index < data.posts.length - 1 && <hr />}
-        </React.Fragment>
+        </Fragment>
       ))}
 
       {data && (

@@ -1,6 +1,6 @@
 import { type FormEvent, type ReactNode } from 'react'
 import { Navigate, useNavigate } from 'react-router'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import useSWRMutation from 'swr/mutation'
 import { isAxiosError } from 'axios'
 import { postApi } from '../api/post'
 import type { PostErrorResponse } from '../types/post'
@@ -9,24 +9,27 @@ import { useAuth } from '../contexts/auth'
 function Create() {
   const { user, isLoading: isAuthLoading } = useAuth()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
 
-  const createMutation = useMutation({
-    mutationFn: postApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] })
-      navigate('/')
+  const { trigger, isMutating, error } = useSWRMutation(
+    'posts',
+    async (_, { arg }: { arg: { title: string; body: string } }) => {
+      await postApi.create(arg)
     },
-  })
+    {
+      onSuccess: () => {
+        navigate('/')
+      },
+    }
+  )
 
-  const errorMessage = createMutation.error
-    ? (isAxiosError<PostErrorResponse>(createMutation.error) && createMutation.error.response?.data?.message) || '投稿の作成に失敗しました'
+  const errorMessage = error
+    ? (isAxiosError<PostErrorResponse>(error) && error.response?.data?.message) || '投稿の作成に失敗しました'
     : null
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    createMutation.mutate({
+    await trigger({
       title: formData.get('title') as string,
       body: formData.get('body') as string,
     })
@@ -52,7 +55,7 @@ function Create() {
 
   return renderLayout(
     <>
-      {createMutation.isPending && <div className="flash">送信中...</div>}
+      {isMutating && <div className="flash">送信中...</div>}
       {errorMessage && <div className="flash">{errorMessage}</div>}
       <form method="post" onSubmit={handleSubmit}>
         <label htmlFor="title">Title</label>
@@ -66,7 +69,7 @@ function Create() {
           name="body"
           id="body"
         ></textarea>
-        <input type="submit" value="Save" disabled={createMutation.isPending} />
+        <input type="submit" value="Save" disabled={isMutating} />
       </form>
     </>
   )

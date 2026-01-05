@@ -2,4 +2,5 @@
 body { max-width: 960px; margin: 0 auto; background: white; }
 h1 { font-family: serif; color: #377ba8; margin: 1rem 0; }
 a { color: #377ba8; }
+button.anchor { background: none; border: none; color: #377ba8; text-decoration: underline; font: inherit; cursor: pointer }
 hr { border: none; border-top: 1px solid lightgray; }

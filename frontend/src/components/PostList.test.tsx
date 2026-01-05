@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
+import { SWRConfig } from 'swr'
 import { BrowserRouter } from 'react-router'
 import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest'
 import { setupServer } from 'msw/node'
@@ -11,7 +11,7 @@ import type { Post, ListPostsResponse } from '../types/post.ts'
 // 1. MSWのサーバー設定: APIのモック
 const posts: Post[] = [
   { id: 1, title: 'Vitestの基本', body: '', created: '2025-01-01', author: { id: 1, username: 'foo' } },
-  { id: 2, title: 'TanStack Queryのテスト', body: '', created: '2025-01-01', author: { id: 2, username: 'bar' } },
+  { id: 2, title: 'SWRのテスト', body: '', created: '2025-01-01', author: { id: 2, username: 'bar' } },
 ];
 const mockListPostsResponse: ListPostsResponse = {
   success: true,
@@ -33,32 +33,27 @@ const server = setupServer(
   })
 );
 
-beforeAll(() => server.listen());
-afterEach(() => server.resetHandlers());
-afterAll(() => server.close());
-
 // 2. テスト用のラッパー作成
-const createTestQueryClient = () =>
-  new QueryClient({
-    defaultOptions: {
-      queries: { retry: false }, // テスト失敗時に何度もリトライしないようにする
-    },
-  });
-
 const renderWithProviders = (ui: React.ReactElement) => {
-  const queryClient = createTestQueryClient()
   return render(
-    <QueryClientProvider client={queryClient}>
+    <SWRConfig value={{ dedupingInterval: 0, provider: () => new Map() }}>
       <AuthProvider>
         <BrowserRouter>
           {ui}
         </BrowserRouter>
       </AuthProvider>
-    </QueryClientProvider>
+    </SWRConfig>
   )
 }
 
 describe('PostList Component', () => {
+  beforeAll(() => server.listen());
+  afterEach(() => {
+    cleanup()
+    server.resetHandlers()
+  });
+  afterAll(() => server.close());
+
   it('APIから取得した記事一覧が表示されること', async () => {
     renderWithProviders(<PostList />);
 
@@ -68,7 +63,7 @@ describe('PostList Component', () => {
     // データの取得が完了し、レンダリングされるのを待つ
     await waitFor(() => {
       expect(screen.getByText('Vitestの基本')).toBeInTheDocument();
-      expect(screen.getByText('TanStack Queryのテスト')).toBeInTheDocument();
+      expect(screen.getByText('SWRのテスト')).toBeInTheDocument();
     });
   });
 
