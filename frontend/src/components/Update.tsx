@@ -7,16 +7,6 @@ import { postApi } from '../api/post'
 import type { PostErrorResponse } from '../types/post'
 import { useAuth } from '../contexts/auth'
 
-const renderLayout = (content: ReactNode) => (
-  <>
-    <title>Edit - Flaskr</title>
-    <header>
-      <h1>Edit Post</h1>
-    </header>
-    {content}
-  </>
-)
-
 interface UpdateFormProps {
   id: string
 }
@@ -78,14 +68,14 @@ function UpdateForm({ id }: UpdateFormProps) {
   }
 
   if (isLoading) {
-    return renderLayout(<div className="flash">読み込み中...</div>)
+    return <div className="flash">読み込み中...</div>
   }
 
   if (!post) {
-    return renderLayout(<div className="flash">投稿が見つかりません</div>)
+    return <div className="flash">投稿が見つかりません</div>
   }
 
-  return renderLayout(
+  return (
     <>
       {(isUpdating || isDeleting) && <div className="flash">送信中...</div>}
       {errorMessage && <div className="flash">{errorMessage}</div>}
@@ -117,6 +107,16 @@ function Update() {
   const { user, isLoading: isAuthLoading } = useAuth()
   const { id } = useParams<{ id: string }>()
 
+  const renderLayout = (content: ReactNode) => (
+    <>
+      <title>Edit - Flaskr</title>
+      <header>
+        <h1>Edit Post</h1>
+      </header>
+      {content}
+    </>
+  )
+
   // 認証状態の読み込み中は待機
   if (isAuthLoading) {
     return renderLayout(<div className="flash">認証確認中...</div>)
@@ -130,8 +130,8 @@ function Update() {
     return renderLayout(<div className="flash">無効なURLです</div>)
   }
 
-  // idが確定したのでUpdateFormに委譲
-  return <UpdateForm id={id} />
+  // idが確定したのでUpdateFormに委譲（レイアウトを適用）
+  return renderLayout(<UpdateForm id={id} />)
 }
 
 export default Update;
