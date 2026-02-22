@@ -27,6 +27,85 @@ README に記載した技術トレンドの多くが React を前提にした整
 
 SWR の公式 Solid アダプターは存在しない（コミュニティ製のみ）。小規模 CRUD なら `createResource` で代替できる範囲に収まる。
 
+### コードレベルで簡潔になる箇所
+
+#### 認証状態管理 — Provider パターンが不要になる
+
+現行の `contexts/auth.tsx` は SWR + Context を組み合わせるために、Context 定義・Provider コンポーネント・`useAuth` フックという3層構造が必要になっている。
+
+```tsx
+// 現行 React — 3層構造が必要
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function AuthProvider({ children }) {
+  const { data: user, isLoading } = useSWR('/api/me', fetcher);
+  const { trigger: login }        = useSWRMutation('/api/login', ...);
+  const { trigger: logout }       = useSWRMutation('/api/logout', ...);
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+export const useAuth = () => useContext(AuthContext)!;
+```
+
+```ts
+// SolidJS — モジュール export で済む（Provider 不要）
+export const [user] = createResource(fetchCurrentUser);
+
+export async function login(credentials) {
+  await apiLogin(credentials);
+  user.refetch();
+}
+```
+
+Signal はコンポーネント外に置けるため、Provider でラップするという React 固有の儀式が消える。
+
+#### 複数 Mutation の状態合成 — Update.tsx
+
+`Update.tsx` では更新と削除の2つの Mutation を管理し、状態を手動で合成している。
+
+```tsx
+// 現行 React — isMutating と error を手動合成
+const { trigger: update,  isMutating: isUpdating, error: updateError } = useSWRMutation(...);
+const { trigger: remove,  isMutating: isDeleting, error: deleteError } = useSWRMutation(...);
+
+const isMutating = isUpdating || isDeleting;
+const error      = updateError ?? deleteError;
+```
+
+```tsx
+// SolidJS（TanStack Query for Solid）— JSX 内で直接参照
+const updateMutation = createMutation(() => ({ mutationFn: updatePost }));
+const deleteMutation = createMutation(() => ({ mutationFn: deletePost }));
+
+// JSX 内の式はリアクティブなので手動合成が不要
+<button disabled={updateMutation.isPending || deleteMutation.isPending}>
+```
+
+#### URL パラメータとデータ取得の連動 — PostList.tsx
+
+```tsx
+// 現行 React — SWR のキャッシュキー変化を経由して間接的に連動
+const [searchParams] = useSearchParams();
+const page = Number(searchParams.get('page') ?? '1');
+const { data: posts } = useSWR(`/api/posts?page=${page}`, fetcher);
+```
+
+```tsx
+// SolidJS — searchParams はリアクティブプロキシ。source 変化で自動再フェッチ
+const [searchParams] = useSearchParams();
+const [posts] = createResource(
+  () => searchParams.page ?? '1',   // ← ここが変わると自動で再フェッチ
+  (page) => fetchPosts(page)
+);
+```
+
+React の場合、連動は「SWR がキャッシュキーの変化を検知する」という間接的な仕組みに依存している。SolidJS では `createResource` のソース関数がリアクティブスコープ内で実行されるため、依存関係が明示的かつ自動的に追跡される。
+
+---
+
 ### 状態管理の4層モデル
 
 README では React の設計都合から状態を4層に分類した。SolidJS では Signal がグローバルにも使えるため、層の境界が一部融合する。
@@ -34,8 +113,6 @@ README では React の設計都合から状態を4層に分類した。SolidJS 
 - **サーバー状態** → `createResource` または TanStack Query for Solid
 - **グローバルUI状態** → Signal をモジュール export するだけ。Context + Provider が不要になるケースが多い
 - **フォーム・ローカル状態** → `createSignal`（変わらない）
-
-`contexts/auth.tsx` に相当するものは、SWR と Context を組み合わせる必要がなくなり、Signal 単体でシンプルに書ける可能性がある。
 
 ### ルーティング設計
 
@@ -60,42 +137,65 @@ README の「次の実験候補」を SolidJS 視点で見ると：
 
 ```
 SolidJS が選ばれる実際の文脈
-├── 正当な技術的理由
-│   ├── 高頻度 DOM 更新が本当にボトルネックのアプリ
-│   └── バンドルサイズが厳しく制約される環境
+├── 実際に改善される（設計的根拠あり）
+│   ├── Signal のグローバル利用 → Provider パターンが不要
+│   ├── 細粒度リアクティビティ → useMemo / useCallback が不要
+│   └── createResource のネイティブ統合 → 非同期処理が単純
 │
-├── 正当だが誇張されがちな理由
-│   ├── DX の良さ（Signal は確かに直感的）
-│   └── React の欠点からの解放感
+├── 誇張されがちな改善
+│   ├── 「React より簡単」← 別種の複雑さが残る
+│   └── パフォーマンス優位 ← DOM 操作がボトルネックのアプリは限定的
 │
-└── 批判的に見るべき理由
+└── 批判的に見るべき採用動機
     ├── ベンチマーク数字の過大解釈
     ├── 言説量が実採用量を上回るエコシステム錯覚
     ├── React への習熟不足の別解としての選択
     └── ポートフォリオ差別化動機
 ```
 
-### DX と学習曲線
+### 実際に改善される部分とその設計的背景
 
-**事実：** `useEffect` の依存配列バグ、stale closure 問題、`useMemo`/`useCallback` の判断コスト、Context 再レンダリング問題——これらは React の実際の欠点であり、大規模コードベースで累積する。SolidJS では Signal により Hook のルールや再レンダリングの理解が不要になる。
+#### Signal のグローバル利用 → Provider パターンが不要
 
-**批判的視点：** これらの問題の多くは「React を正しく理解して使えば回避できる問題」でもある。「React が難しかった」という移行動機は、React の設計上の問題である場合と学習投資の不足である場合が混在している。
+React の Hook はコンポーネント内でしか呼び出せない。この制約が「グローバル状態を共有するには Provider でラップするしかない」という設計上の強制を生んでいる。`contexts/auth.tsx` がその典型で、SWR・Context・useContext・Provider という複数の仕組みを組み合わせて初めて認証状態を共有できる。
 
-Signal ベースのリアクティビティも別種の複雑さを持つ：
+SolidJS の Signal はただの値であり、モジュールのトップレベルに置いてそのまま export できる。コンポーネントツリーへの配置に依存しないため、Provider という概念が不要になる。この差は「コード量の節約」ではなく、**「状態をコンポーネントツリーの外に切り出せる」という設計自由度の差**。
 
-- `untrack()` でトラッキングを意図的に切る必要がある場面
-- リアクティブスコープ外での値読み取りが無音で失敗する
+#### 細粒度リアクティビティ → useMemo / useCallback / React.memo が不要
+
+React の再レンダリングはコンポーネント単位で発生する。state が変わると、そのコンポーネント以下のツリーを原則として全部再実行する。`useMemo`・`useCallback`・`React.memo` はこの「不要な再実行を防ぐ」ための事後対処として存在する。
+
+SolidJS にはコンポーネントの「再レンダリング」という概念がない。コンポーネント関数は初回の1回だけ実行され、以降は Signal が変化したときに **Signal を読んでいる DOM 式だけ**が更新される。最適化する「コンポーネントの再実行」自体が起きないため、最適化のための API が不要になる。
+
+この差は規模が大きくなるほど効いてくる。小規模アプリでは React でも `useMemo` なしで動くことが多いが、中規模以上になると「どこで `memo` が必要か」の判断が散在しはじめる。
+
+#### createResource のネイティブ統合 → 非同期処理が単純
+
+SWR は React に非同期状態管理を追加するライブラリであり、Suspense との統合は `{ suspense: true }` オプション経由で「後付け」になっている。実際に既知の挙動の問題がある（Suspense モードでの revalidation の扱いなど）。
+
+SolidJS の `createResource` はリアクティビティシステムに組み込まれた非同期プリミティブであり、`<Suspense>` との統合は設計の一部。loading / error / data の3状態が Signal と同じ追跡モデルで管理され、追加ライブラリなしで動く。小規模アプリでは SWR に相当するものが `createResource` 一つで済む。
+
+### 誇張されがちな改善
+
+「React より直感的」「React の複雑さから解放される」という声は実態を半分しか伝えていない。
+
+Signal ベースのリアクティビティにも別種の複雑さが存在する：
+
+- `untrack()` でトラッキングを意図的に切る必要がある場面がある
+- リアクティブスコープ外で Signal を読んでも値が追跡されず、無音で失敗する
 - `batch()` による更新のバッチング管理
 
-**推測：** SolidJS へ移行して「楽になった」という声の一部は、React の複雑なユースケース（グローバル状態、複雑な Effect）から SolidJS で書いた小規模アプリへの比較をしている。同規模・同要件で比較した場合の差はより小さいはず。
+**推測：** 「SolidJS に移行して楽になった」という声の一部は、React の複雑なユースケース（グローバル状態、複雑な Effect）から SolidJS で書いた小規模アプリへの比較をしている。同規模・同要件で比較した場合の差はより小さいはず。
 
-### ベンチマーク信仰
+### 批判的に見るべき採用動機
+
+#### ベンチマーク信仰
 
 `js-framework-benchmark` での優位は事実だが、一般的な CRUD アプリのボトルネックは DOM 操作速度ではない。「パフォーマンス」が採用理由として語られるとき、実際には「パフォーマンス不満」ではなく「パフォーマンスへの美的こだわり」または後付け理由であることが多い。
 
-### エコシステムの実態
+#### エコシステム錯覚
 
-満足度が高い（State of JS 2023 で約 79%）一方、使用率は約 10%。満足度の母集団がアーリーアダプターに偏っている。Ryan Carniato の発信力の高さが、コミュニティの実態よりも大きな規模感を作り出している側面がある。
+満足度が高い（State of JS 2023 で約 79%）一方、使用率は約 10%。满足度の母集団がアーリーアダプターに偏っている。Ryan Carniato の発信力の高さが、コミュニティの実態よりも大きな規模感を作り出している側面がある。
 
 | 観点 | React | SolidJS |
 |------|-------|---------|
