@@ -77,7 +77,7 @@ React の状態管理を4層に分類するモデルがある。このプロジ�
 
 `contexts/auth.tsx` は SWR と Context を組み合わせている点が特徴的。認証状態を `useSWR` でキャッシュ・再バリデーションしつつ、Context でコンポーネントツリーに提供している。サーバー状態とグローバルUI状態の境界が SWR によって一本化された形になっている。
 
-**SWR と TanStack Query**
+#### SWR と TanStack Query
 
 4層モデルではサーバー状態のツールとして TanStack Query が挙げられることが多いが、これは TanStack 側の立場からの整理であり、SWR も同じ層を担える。
 
@@ -131,7 +131,15 @@ Declarative モードでは `<Link to="...">` や `useParams()` に型が付か�
 
 小規模（5〜10 ルート程度）なら上記デメリットは UX 上許容できるケースが多く、構成の単純さと学習効率が優先される。Data モードや TanStack Router への移行を検討するシグナル：ルート数が増えネストが深くなる / 認証フラッシュが UX 上許容できなくなる / Mutation が複雑になり DevTools が欲しくなる
 
-#### 次の実験候補
+## 次の実験候補
+
+### 状態管理
+
+1. **`useActionState`（React 19 ネイティブ）** — 現在 `useState` で手動管理している「送信中か / エラーは何か」を React 19 標準 API に置き換える。ライブラリ追加なしで完結する最小の実験
+2. **SWR の楽観的更新** — `useSWRMutation` の `optimisticData` オプションで投稿削除・更新を即時反映する。現在はサーバー応答を待ってから再フェッチしているため、体感 UX の変化と実装コストを比較できる
+3. **Zustand / Jotai によるグローバルUI状態の分離** — `contexts/auth.tsx` で混在している SWR（サーバー状態）と Context（グローバルUI状態）を切り離し、4層の境界を明確にする。現状の小規模アプリでは Context で十分なため、規模が増してから検討する方が学びが大きい
+
+### ルーティング
 
 1. **React Router Data モード** — `createBrowserRouter` + `loader` で認証チェックをレンダリング前に行う（`App.tsx` 内にすでにメモあり）
 2. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。SWR との相性も良い
