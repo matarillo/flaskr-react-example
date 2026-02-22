@@ -21,15 +21,18 @@ README に記載した技術トレンドの多くが React を前提にした整
 | `useState` | `createSignal` | 小（概念は近い） |
 | `useContext` + SWR | モジュールレベルの Signal | 大（Provider 不要になることが多い） |
 | SWR | `createResource`（組み込み）/ TanStack Query for Solid | 中 |
+| Zustand / Jotai | `createStore`（組み込み） | 大（外部ライブラリ不要） |
 | React Router v7 Declarative | `@solidjs/router` | 小（構造は近い） |
 | Vitest + MSW | そのまま使える | なし |
 | Vite | そのまま使える | なし |
 
 SWR の公式 Solid アダプターは存在しない（コミュニティ製のみ）。小規模 CRUD なら `createResource` で代替できる範囲に収まる。
 
-### コードレベルで簡潔になる箇所
+### 設計プリミティブの変化
 
-#### 認証状態管理 — Provider パターンが不要になる
+各改善がどの設計的変化に起因するかをコード例と合わせて示す。
+
+#### 認証状態管理 — Signal のグローバル利用で Provider が不要になる
 
 現行の `contexts/auth.tsx` は SWR + Context を組み合わせるために、Context 定義・Provider コンポーネント・`useAuth` フックという3層構造が必要になっている。
 
@@ -60,9 +63,9 @@ export async function login(credentials) {
 }
 ```
 
-Signal はコンポーネント外に置けるため、Provider でラップするという React 固有の儀式が消える。
+React の Hook はコンポーネント内でしか呼び出せない。この制約が「グローバル状態を共有するには Provider でラップするしかない」という設計上の強制を生んでいる。SolidJS の Signal はただの値であり、モジュールのトップレベルに置いてそのまま export できるため、Provider という概念が不要になる。この差は「コード量の節約」ではなく、**「状態をコンポーネントツリーの外に切り出せる」という設計自由度の差**。
 
-#### 複数 Mutation の状態合成 — Update.tsx
+#### 複数 Mutation の状態合成 — 細粒度リアクティビティで手動合成が不要になる
 
 `Update.tsx` では更新と削除の2つの Mutation を管理し、状態を手動で合成している。
 
@@ -80,11 +83,12 @@ const error      = updateError ?? deleteError;
 const updateMutation = createMutation(() => ({ mutationFn: updatePost }));
 const deleteMutation = createMutation(() => ({ mutationFn: deletePost }));
 
-// JSX 内の式はリアクティブなので手動合成が不要
 <button disabled={updateMutation.isPending || deleteMutation.isPending}>
 ```
 
-#### URL パラメータとデータ取得の連動 — PostList.tsx
+SolidJS では JSX 内の式がリアクティブスコープとして実行されるため、Signal や Mutation 状態を直接参照できる。加えて、SolidJS にはコンポーネントの「再レンダリング」という概念がない。コンポーネント関数は初回の1回だけ実行され、Signal が変化したときに **Signal を読んでいる DOM 式だけ**が更新されるため、`useMemo` / `useCallback` / `React.memo` が不要になる——最適化する対象の再実行そのものが起きない設計になっている。
+
+#### URL パラメータとデータ取得の連動 — createResource で依存追跡が自動になる
 
 ```tsx
 // 現行 React — SWR のキャッシュキー変化を経由して間接的に連動
@@ -102,9 +106,24 @@ const [posts] = createResource(
 );
 ```
 
-React の場合、連動は「SWR がキャッシュキーの変化を検知する」という間接的な仕組みに依存している。SolidJS では `createResource` のソース関数がリアクティブスコープ内で実行されるため、依存関係が明示的かつ自動的に追跡される。
+React では「SWR がキャッシュキーの変化を検知する」という間接的な仕組みに依存している。SolidJS の `createResource` はリアクティビティシステムに組み込まれた非同期プリミティブであり、ソース関数がリアクティブスコープ内で実行されるため依存関係が自動追跡される。SWR の Suspense 統合は `{ suspense: true }` オプション経由の後付けで既知の挙動問題があるが、`createResource` + `<Suspense>` は設計の一部として統合されている。
 
----
+#### 複雑なネストオブジェクト — createStore で Zustand / Jotai が不要になる
+
+このプロジェクトの規模では出番がないが、ネストしたオブジェクト状態を扱う場面では `createStore` が組み込みで利用できる。
+
+```ts
+const [state, setState] = createStore({
+  user: { name: 'Alice', preferences: { theme: 'dark' } },
+  posts: [] as Post[]
+});
+
+// 深いプロパティも細粒度で追跡される
+setState('user', 'name', 'Bob');
+// user.name を読んでいる箇所だけ更新。posts は無影響
+```
+
+React で Zustand / Jotai が必要になる理由は「Hook はコンポーネント外に置けない」「Context は変化のたびにツリーを再レンダリングする」の2点だが、SolidJS ではどちらも存在しない。Signal がコンポーネント外に置けて細粒度で追跡されるため、外部ライブラリなしに同じことができる。`createStore` の `produce` ヘルパーは Immer に相当する不変更新の書き心地を提供する。
 
 ### 状態管理の4層モデル
 
@@ -112,6 +131,7 @@ README では React の設計都合から状態を4層に分類した。SolidJS 
 
 - **サーバー状態** → `createResource` または TanStack Query for Solid
 - **グローバルUI状態** → Signal をモジュール export するだけ。Context + Provider が不要になるケースが多い
+- **複雑なネストオブジェクト** → `createStore`（Zustand / Jotai 不要）
 - **フォーム・ローカル状態** → `createSignal`（変わらない）
 
 ### ルーティング設計
@@ -133,29 +153,6 @@ README の「次の実験候補」を SolidJS 視点で見ると：
 
 ## Part 2 — 採用動機の批判的分析
 
-
-### 実際に改善される部分とその設計的背景
-
-#### Signal のグローバル利用 → Provider パターンが不要
-
-React の Hook はコンポーネント内でしか呼び出せない。この制約が「グローバル状態を共有するには Provider でラップするしかない」という設計上の強制を生んでいる。`contexts/auth.tsx` がその典型で、SWR・Context・useContext・Provider という複数の仕組みを組み合わせて初めて認証状態を共有できる。
-
-SolidJS の Signal はただの値であり、モジュールのトップレベルに置いてそのまま export できる。コンポーネントツリーへの配置に依存しないため、Provider という概念が不要になる。この差は「コード量の節約」ではなく、**「状態をコンポーネントツリーの外に切り出せる」という設計自由度の差**。
-
-#### 細粒度リアクティビティ → useMemo / useCallback / React.memo が不要
-
-React の再レンダリングはコンポーネント単位で発生する。state が変わると、そのコンポーネント以下のツリーを原則として全部再実行する。`useMemo`・`useCallback`・`React.memo` はこの「不要な再実行を防ぐ」ための事後対処として存在する。
-
-SolidJS にはコンポーネントの「再レンダリング」という概念がない。コンポーネント関数は初回の1回だけ実行され、以降は Signal が変化したときに **Signal を読んでいる DOM 式だけ**が更新される。最適化する「コンポーネントの再実行」自体が起きないため、最適化のための API が不要になる。
-
-この差は規模が大きくなるほど効いてくる。小規模アプリでは React でも `useMemo` なしで動くことが多いが、中規模以上になると「どこで `memo` が必要か」の判断が散在しはじめる。
-
-#### createResource のネイティブ統合 → 非同期処理が単純
-
-SWR は React に非同期状態管理を追加するライブラリであり、Suspense との統合は `{ suspense: true }` オプション経由で「後付け」になっている。実際に既知の挙動の問題がある（Suspense モードでの revalidation の扱いなど）。
-
-SolidJS の `createResource` はリアクティビティシステムに組み込まれた非同期プリミティブであり、`<Suspense>` との統合は設計の一部。loading / error / data の3状態が Signal と同じ追跡モデルで管理され、追加ライブラリなしで動く。小規模アプリでは SWR に相当するものが `createResource` 一つで済む。
-
 ### 誇張されがちな改善
 
 「React より直感的」「React の複雑さから解放される」という声は実態を半分しか伝えていない。
@@ -176,7 +173,7 @@ Signal ベースのリアクティビティにも別種の複雑さが存在す�
 
 #### エコシステム錯覚
 
-満足度が高い（State of JS 2023 で約 79%）一方、使用率は約 10%。满足度の母集団がアーリーアダプターに偏っている。Ryan Carniato の発信力の高さが、コミュニティの実態よりも大きな規模感を作り出している側面がある。
+満足度が高い（State of JS 2023 で約 79%）一方、使用率は約 10%。満足度の母集団がアーリーアダプターに偏っている。Ryan Carniato の発信力の高さが、コミュニティの実態よりも大きな規模感を作り出している側面がある。
 
 | 観点 | React | SolidJS |
 |------|-------|---------|
