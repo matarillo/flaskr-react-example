@@ -133,17 +133,19 @@ Declarative モードでは `<Link to="...">` や `useParams()` に型が付か�
 
 ## 次の実験候補
 
-### 状態管理
+### 現在のスタックで即実施可能
 
 1. **`useActionState`（React 19 ネイティブ）** — 現在 `useState` で手動管理している「送信中か / エラーは何か」を React 19 標準 API に置き換える。ライブラリ追加なしで完結する最小の実験
 2. **SWR の楽観的更新** — `useSWRMutation` の `optimisticData` オプションで投稿削除・更新を即時反映する。現在はサーバー応答を待ってから再フェッチしているため、体感 UX の変化と実装コストを比較できる
-3. **Zustand / Jotai によるグローバルUI状態の分離** — `contexts/auth.tsx` で混在している SWR（サーバー状態）と Context（グローバルUI状態）を切り離し、4層の境界を明確にする。現状の小規模アプリでは Context で十分なため、規模が増してから検討する方が学びが大きい
+3. **`useOptimistic`（React 19 ネイティブ）による楽観的UI** — SWR の `optimisticData` とは異なり React が直接管理する楽観的更新の仕組みを試す。SPA では `useTransition` + 非同期関数と組み合わせて使えるが、本来の力は Server Actions + RSC との組み合わせで発揮される。SWR アプローチとの実装コスト・コードの明快さを比較する
+4. **Suspense + `React.lazy` によるコード分割** — 各ルートコンポーネントを遅延読み込みし Suspense でローディング UI を宣言的に配置する。データフェッチとの統合（`useSWR({ suspense: true })`）も試せるが、安定性は TanStack Query の方が高い
 
-### ルーティング
+### ライブラリの追加・変更を伴う
 
-1. **React Router Data モード** — `createBrowserRouter` + `loader` で認証チェックをレンダリング前に行う（`App.tsx` 内にすでにメモあり）
-2. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。SWR との相性も良い
-3. **React Router Framework モード** — `routes.ts` によるファイルベースルーティングを試す
+5. **React Router Data モード** — `createBrowserRouter` + `loader` を導入することで2つの問題を同時に解決できる：ルート遷移と並行してデータフェッチを開始する（ウォーターフォール排除）/ 認証チェックをレンダリング前に完了してフラッシュを防ぐ（`App.tsx` 内にすでにメモあり）
+6. **Zustand / Jotai によるグローバルUI状態の分離** — `contexts/auth.tsx` で混在している SWR（サーバー状態）と Context（グローバルUI状態）を切り離し、4層の境界を明確にする。現状の小規模アプリでは Context で十分なため、規模が増してから検討する方が学びが大きい
+7. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。SWR との相性も良い。Suspense を使ったデータフェッチのローディング体験統合は SWR より TanStack Query + TanStack Router の組み合わせで実現しやすい
+8. **React Router Framework モード** — `routes.ts` によるファイルベースルーティングを試す
 
 ## 起動方法
 
