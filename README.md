@@ -16,7 +16,7 @@ Flask の公式チュートリアルアプリ「Flaskr」を、Spring Boot と R
 | **SWR** | `useSWR` / `useSWRMutation` によるデータフェッチ・キャッシュ管理 |
 | **セッション認証** | Cookie ベースの認証フロー（Spring Security + `withCredentials`）|
 | **Spring Data JDBC** | JPA を使わないシンプルな ORM |
-| **React Router v7** | ネストレイアウト構成（`<Outlet>`）|
+| **React Router v7** | Declarative モード（`BrowserRouter` + `Routes`）でネストレイアウト構成（`<Outlet>`）|
 | **Vitest + MSW** | フロントエンドのユニットテスト・API モック |
 | **SonarQube / JaCoCo** | 静的解析とカバレッジ計測 |
 | **Bitbucket Pipelines** | CI/CD パイプライン構築 |
@@ -72,6 +72,20 @@ src/main/java/.../      # Spring Boot アプリ
   *Repository.java      # Spring Data JDBC
   SecurityConfig.java   # 認証・認可設定
 ```
+
+## React Router のモードについて
+
+React Router v7 には3つのモードがある。このプロジェクトは **Declarative モード** を採用。
+
+| モード | API | 特徴 |
+|--------|-----|------|
+| **Declarative** ← 本プロジェクト | `BrowserRouter` + `Routes` + `Route` | 基本ルーティングのみ。独自のデータレイヤーと組み合わせやすい |
+| **Data** | `createBrowserRouter` + `RouterProvider` | `loader` / `action` でルート単位のデータ取得・処理が可能 |
+| **Framework** | `routes.ts` による設定ファイル | SSR、型安全 href、自動コード分割など最フル機能 |
+
+Declarative モードを選んだ理由は、データ取得を SWR に任せる構成と相性が良いため。
+認証チェックは現状 `<Navigate>` コンポーネントで各ページ内に実装しているが、
+Data モードの `loader` を使えばレンダリング前にリダイレクトできる（次の実験候補）。
 
 ## 起動方法
 
