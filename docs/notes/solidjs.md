@@ -19,42 +19,44 @@ README に記載した技術トレンドの多くが React を前提にした整
 | 現行（React） | SolidJS での対応 | 変化の大きさ |
 |--------------|----------------|------------|
 | `useState` | `createSignal` | 小（概念は近い） |
-| `useContext` + SWR | モジュールレベルの Signal | 大（Provider 不要になることが多い） |
-| SWR | `createResource`（組み込み）/ TanStack Query for Solid | 中 |
+| `rootLoader` + `useRouteLoaderData` | モジュールレベルの Signal | 中（ルーターとの結合がなくなる） |
+| React Router `loader` | `createResource`（組み込み）/ TanStack Query for Solid | 中 |
 | Zustand / Jotai | `createStore`（組み込み） | 大（外部ライブラリ不要） |
 | React Router v7 Data | `@solidjs/router` | 小（構造は近い） |
 | Vitest + MSW | そのまま使える | なし |
 | Vite | そのまま使える | なし |
 
-SWR の公式 Solid アダプターは存在しない（コミュニティ製のみ）。小規模 CRUD なら `createResource` で代替できる範囲に収まる。
+本プロジェクトでは SWR を廃止し React Router `loader` に移行済み。`loader` と `createResource` はどちらも「レンダリング前のデータ取得」という同じ目的を持ち、構造的に近い。
 
 ### 設計プリミティブの変化
 
 各改善がどの設計的変化に起因するかをコード例と合わせて示す。
 
-#### 認証状態管理 — Signal のグローバル利用で Provider が不要になる
+#### 認証状態管理 — Signal のグローバル利用でルーターとの結合が不要になる
 
-現行の `contexts/auth.tsx` は SWR + Context を組み合わせるために、Context 定義・Provider コンポーネント・`useAuth` フックという3層構造が必要になっている。
+現行の React Router Data モードでは、`rootLoader` がルートレベルで認証状態を取得し、`useLoaderData` / `useRouteLoaderData` で子ルートに提供している。Provider/Context は不要だが、認証状態がルーターのライフサイクルに結合している。
 
 ```tsx
-// 現行 React — 3層構造が必要
-const AuthContext = createContext<AuthContextType | null>(null);
-
-export function AuthProvider({ children }) {
-  const { data: user, isLoading } = useSWR('/api/me', fetcher);
-  const { trigger: login }        = useSWRMutation('/api/login', ...);
-  const { trigger: logout }       = useSWRMutation('/api/logout', ...);
-  return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+// 現行 React — rootLoader でルーター経由の認証状態管理
+export async function rootLoader(): Promise<{ user: User | null }> {
+  try {
+    const response = await authApi.getCurrentUser()
+    if (response.success) {
+      return { user: { userId: response.userId, username: response.username } }
+    }
+    return { user: null }
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 401) return { user: null }
+    throw error
+  }
 }
-export const useAuth = () => useContext(AuthContext)!;
+
+// Layout: const { user } = useLoaderData()
+// 子ルート: const { user } = useRouteLoaderData('root')
 ```
 
 ```ts
-// SolidJS — モジュール export で済む（Provider 不要）
+// SolidJS — モジュール export で済む（ルーターと無関係に状態管理）
 export const [user] = createResource(fetchCurrentUser);
 
 export async function login(credentials) {
@@ -63,38 +65,51 @@ export async function login(credentials) {
 }
 ```
 
-React の Hook はコンポーネント内でしか呼び出せない。この制約が「グローバル状態を共有するには Provider でラップするしかない」という設計上の強制を生んでいる。SolidJS の Signal はただの値であり、モジュールのトップレベルに置いてそのまま export できるため、Provider という概念が不要になる。この差は「コード量の節約」ではなく、**「状態をコンポーネントツリーの外に切り出せる」という設計自由度の差**。
+React Router Data モードでは Provider/Context こそ不要になったが、認証状態はルーターの `loader` に組み込まれている——ナビゲーション時に再実行され、ルーティングと状態管理が結合する設計。SolidJS の Signal はモジュールのトップレベルに置けるため、ルーターやコンポーネントツリーとは完全に独立した状態管理が可能になる。この差は**「状態をどのレイヤーにも結合させない設計自由度」**。
 
-#### 複数 Mutation の状態合成 — 細粒度リアクティビティで手動合成が不要になる
+#### 複数 Mutation の状態管理 — 細粒度リアクティビティで操作ごとの状態を区別できる
 
-`Update.tsx` では更新と削除の2つの Mutation を管理し、状態を手動で合成している。
+現行の `Update.tsx` では、1つの `action` 関数が `intent` パターンで update / delete を区別し、`useNavigation` でフォーム全体の送信状態を管理している。
 
 ```tsx
-// 現行 React — isMutating と error を手動合成
-const { trigger: update,  isMutating: isUpdating, error: updateError } = useSWRMutation(...);
-const { trigger: remove,  isMutating: isDeleting, error: deleteError } = useSWRMutation(...);
+// 現行 React — action + intent パターン（更新・削除を1つの action で処理）
+export async function updateAction({ request, params }) {
+  const formData = await request.formData()
+  const intent = formData.get('intent')
+  if (intent === 'delete') { /* 削除処理 */ }
+  // 更新処理
+}
 
-const isMutating = isUpdating || isDeleting;
-const error      = updateError ?? deleteError;
+// コンポーネント側 — navigation.state はフォーム全体の状態
+const actionData = useActionData<UpdateActionData>()
+const navigation = useNavigation()
+const isSubmitting = navigation.state === 'submitting'
 ```
 
 ```tsx
-// SolidJS（TanStack Query for Solid）— JSX 内で直接参照
+// SolidJS（TanStack Query for Solid）— 操作ごとに状態が分離
 const updateMutation = createMutation(() => ({ mutationFn: updatePost }));
 const deleteMutation = createMutation(() => ({ mutationFn: deletePost }));
 
-<button disabled={updateMutation.isPending || deleteMutation.isPending}>
+<button disabled={updateMutation.isPending}>Save</button>
+<button disabled={deleteMutation.isPending}>Delete</button>
 ```
 
-SolidJS では JSX 内の式がリアクティブスコープとして実行されるため、Signal や Mutation 状態を直接参照できる。加えて、SolidJS にはコンポーネントの「再レンダリング」という概念がない。コンポーネント関数は初回の1回だけ実行され、Signal が変化したときに **Signal を読んでいる DOM 式だけ**が更新されるため、`useMemo` / `useCallback` / `React.memo` が不要になる——最適化する対象の再実行そのものが起きない設計になっている。
+React Router の intent パターンでは `navigation.state` がフォーム全体に対する状態であり、「更新中か削除中か」の区別がつかない。SolidJS で個別の Mutation を管理すれば、操作ごとの loading / error 状態が分離する。加えて、SolidJS にはコンポーネントの「再レンダリング」という概念がない。コンポーネント関数は初回の1回だけ実行され、Signal が変化したときに **Signal を読んでいる DOM 式だけ**が更新されるため、`useMemo` / `useCallback` / `React.memo` が不要になる——最適化する対象の再実行そのものが起きない設計になっている。
 
-#### URL パラメータとデータ取得の連動 — createResource で依存追跡が自動になる
+#### URL パラメータとデータ取得の連動 — createResource で宣言的な依存追跡が可能になる
 
 ```tsx
-// 現行 React — SWR のキャッシュキー変化を経由して間接的に連動
-const [searchParams] = useSearchParams();
-const page = Number(searchParams.get('page') ?? '1');
-const { data: posts } = useSWR(`/api/posts?page=${page}`, fetcher);
+// 現行 React — loader が request.url から直接 searchParams を取得
+export async function postsLoader({ request }: { request: Request }) {
+  const url = new URL(request.url)
+  const page = parseInt(url.searchParams.get('page') || '0', 10)
+  const size = parseInt(url.searchParams.get('size') || '10', 10)
+  return postApi.list({ page, size })
+}
+
+// コンポーネント側
+const data = useLoaderData() as ListPostsResponse
 ```
 
 ```tsx
@@ -106,7 +121,7 @@ const [posts] = createResource(
 );
 ```
 
-React では「SWR がキャッシュキーの変化を検知する」という間接的な仕組みに依存している。SolidJS の `createResource` はリアクティビティシステムに組み込まれた非同期プリミティブであり、ソース関数がリアクティブスコープ内で実行されるため依存関係が自動追跡される。SWR の Suspense 統合は `{ suspense: true }` オプション経由の後付けで既知の挙動問題があるが、`createResource` + `<Suspense>` は設計の一部として統合されている。
+React Router の loader はナビゲーション（URL 変化）時に再実行されるため、URL パラメータの取得は直接的。ただし loader はナビゲーションイベントに結合しており、「URL は変えずにデータだけ再取得する」操作には向かない。SolidJS の `createResource` はリアクティビティシステムに組み込まれた非同期プリミティブであり、ソース関数がリアクティブスコープ内で実行されるため依存関係が自動追跡される。`createResource` + `<Suspense>` は設計の一部として統合されている。
 
 #### 複雑なネストオブジェクト — createStore で Zustand / Jotai が不要になる
 

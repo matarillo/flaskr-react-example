@@ -19,8 +19,8 @@ SolidJS 考察と同じ問いを Vue に向けた整理。Vue と SolidJS はど
 | 現行（React） | Vue での対応 | 変化の大きさ |
 |--------------|------------|------------|
 | `useState` | `ref()` / `reactive()` | 小（概念は近い） |
-| `useContext` + SWR | Pinia store | 大（Provider 不要になることが多い） |
-| SWR | TanStack Query for Vue / VueUse `useFetch` | 中 |
+| `rootLoader` + `useRouteLoaderData` | Pinia store | 中（ルーターとの結合がなくなる） |
+| React Router `loader` | TanStack Query for Vue / VueUse `useFetch` | 中 |
 | Zustand / Jotai | Pinia（公式）| 大（外部ライブラリが公式に統合されている）|
 | React Router v7 Data | Vue Router | 小（構造は近い） |
 | Vitest + MSW | そのまま使える | なし |
@@ -33,25 +33,27 @@ SolidJS への移行と比べた最大の差は最後の行。React → SolidJS 
 
 ### 設計プリミティブの変化
 
-#### 認証状態管理 — Pinia store で Provider が不要になる
+#### 認証状態管理 — Pinia store でルーターとの結合が不要になる
 
-現行の `contexts/auth.tsx` は SWR + Context を組み合わせるため、Context 定義・Provider コンポーネント・`useAuth` フックという3層構造が必要になっている。
+現行の React Router Data モードでは、`rootLoader` がルートレベルで認証状態を取得し、`useLoaderData` / `useRouteLoaderData` で子ルートに提供している。Provider/Context は不要だが、認証状態がルーターのライフサイクルに結合している。
 
 ```tsx
-// 現行 React — 3層構造が必要
-const AuthContext = createContext<AuthContextType | null>(null);
-
-export function AuthProvider({ children }) {
-  const { data: user, isLoading } = useSWR('/api/me', fetcher);
-  const { trigger: login }        = useSWRMutation('/api/login', ...);
-  const { trigger: logout }       = useSWRMutation('/api/logout', ...);
-  return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+// 現行 React — rootLoader でルーター経由の認証状態管理
+export async function rootLoader(): Promise<{ user: User | null }> {
+  try {
+    const response = await authApi.getCurrentUser()
+    if (response.success) {
+      return { user: { userId: response.userId, username: response.username } }
+    }
+    return { user: null }
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 401) return { user: null }
+    throw error
+  }
 }
-export const useAuth = () => useContext(AuthContext)!;
+
+// Layout: const { user } = useLoaderData()
+// 子ルート: const { user } = useRouteLoaderData('root')
 ```
 
 ```ts
@@ -82,17 +84,20 @@ export const useAuthStore = defineStore('auth', () => {
 })
 ```
 
-React の Hook はコンポーネント内でしか呼び出せない制約が「グローバル状態には Provider でラップするしかない」という設計上の強制を生んでいる。Pinia store はコンポーネント外でも呼び出せるため、Provider という概念が不要になる。この差は「コード量の節約」ではなく、**「状態をコンポーネントツリーから切り離せる」という設計自由度の差**。
+React Router Data モードでは Provider/Context こそ不要になったが、認証状態はルーターの `loader` に組み込まれている——ナビゲーション時に再実行され、ルーティングと状態管理が結合する設計。Pinia store はルーターやコンポーネントツリーとは独立して状態を管理できるため、**「状態をどのレイヤーにも結合させない設計自由度」**がある。
 
 ただし SolidJS と異なり、Pinia はアプリのインスタンスに紐づくため、モジュールレベルに状態を直接置ける SolidJS の Signal より若干制約がある。
 
 #### URL パラメータとデータ取得の連動 — Vue Router のリアクティブ route
 
 ```tsx
-// 現行 React — SWR のキャッシュキー変化を経由して間接的に連動
-const [searchParams] = useSearchParams();
-const page = parseInt(searchParams.get('page') || '0', 10);
-const { data } = useSWR(`posts?page=${page}&size=${size}`, fetcher);
+// 現行 React — loader が request.url から直接 searchParams を取得
+export async function postsLoader({ request }: { request: Request }) {
+  const url = new URL(request.url)
+  const page = parseInt(url.searchParams.get('page') || '0', 10)
+  const size = parseInt(url.searchParams.get('size') || '10', 10)
+  return postApi.list({ page, size })
+}
 ```
 
 ```vue
@@ -109,16 +114,23 @@ const { data, isLoading } = useQuery({
 </script>
 ```
 
-Vue Router が返す `route` はリアクティブオブジェクトであり、URL が変わると `route.query.page` が自動更新される。TanStack Query for Vue の `queryKey` が `computed` を受け取ることで、key 変化時に自動再フェッチが走る。SWR の「キャッシュキー文字列を変化させる」アプローチより依存関係が宣言的。
+Vue Router が返す `route` はリアクティブオブジェクトであり、URL が変わると `route.query.page` が自動更新される。TanStack Query for Vue の `queryKey` が `computed` を受け取ることで、key 変化時に自動再フェッチが走る。React Router の loader はナビゲーション時に再実行されるため URL パラメータの取得は直接的だが、「URL は変えずにデータだけ再取得する」操作には向かない。Vue の `computed` + TanStack Query は依存関係がより宣言的。
 
-#### 複数 Mutation の状態合成
+#### 複数 Mutation の状態管理
 
 ```tsx
-// 現行 React — isMutating と error を手動合成
-const { trigger: update, isMutating: isUpdating, error: updateError } = useSWRMutation(...);
-const { trigger: remove, isMutating: isDeleting, error: deleteError } = useSWRMutation(...);
-const isMutating = isUpdating || isDeleting;
-const error      = updateError ?? deleteError;
+// 現行 React — action + intent パターン（更新・削除を1つの action で処理）
+export async function updateAction({ request, params }) {
+  const formData = await request.formData()
+  const intent = formData.get('intent')
+  if (intent === 'delete') { /* 削除処理 */ }
+  // 更新処理
+}
+
+// コンポーネント側 — navigation.state はフォーム全体の状態
+const actionData = useActionData<UpdateActionData>()
+const navigation = useNavigation()
+const isSubmitting = navigation.state === 'submitting'
 ```
 
 ```vue
@@ -137,7 +149,7 @@ const isMutating = computed(
 </template>
 ```
 
-React の手動合成と記述量は大きく変わらないが、`computed` が依存関係を自動追跡するため、依存配列の書き忘れという問題が発生しない。テンプレート内では `.value` が自動アンラップされる。
+React Router の intent パターンでは `navigation.state` がフォーム全体に対する状態であり、「更新中か削除中か」の区別がつかない。Vue で個別の Mutation を管理すれば、操作ごとの loading / error 状態が分離する。`computed` が依存関係を自動追跡するため、依存配列の書き忘れという問題も発生しない。テンプレート内では `.value` が自動アンラップされる。
 
 ### React Hooks と Vue Composition API の比較
 

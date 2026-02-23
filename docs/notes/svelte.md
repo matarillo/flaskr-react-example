@@ -19,8 +19,8 @@ SolidJS・Vue の考察と同じ問いを Svelte に向けた整理。Svelte は
 | 現行（React） | Svelte での対応 | 変化の大きさ |
 |--------------|----------------|------------|
 | `useState` | `$state()` Rune | 小（概念は近い、構文が変わる） |
-| `useContext` + SWR | `.svelte.ts` のモジュールレベル `$state` | 大（Provider 不要） |
-| SWR | TanStack Query for Svelte / SvelteKit `load` | 中 |
+| `rootLoader` + `useRouteLoaderData` | `.svelte.ts` のモジュールレベル `$state` | 中（ルーターとの結合がなくなる） |
+| React Router `loader` | TanStack Query for Svelte / SvelteKit `load` | 中 |
 | Zustand / Jotai | `.svelte.ts` の `$state`（外部ライブラリ不要） | 大 |
 | React Router v7 Data | SvelteKit（ファイルベース） | **大（構造が全く変わる）** |
 | Vitest + MSW | そのまま使える | なし |
@@ -35,25 +35,27 @@ Vue への移行と同様、React → Svelte は JSX を捨ててテンプレー
 
 ### 設計プリミティブの変化
 
-#### 認証状態管理 — `.svelte.ts` ファイルで Provider が不要になる
+#### 認証状態管理 — `.svelte.ts` ファイルでルーターとの結合が不要になる
 
-現行の `contexts/auth.tsx` は SWR + Context を組み合わせるため、Context 定義・Provider コンポーネント・`useAuth` フックという3層構造が必要になっている。
+現行の React Router Data モードでは、`rootLoader` がルートレベルで認証状態を取得し、`useLoaderData` / `useRouteLoaderData` で子ルートに提供している。Provider/Context は不要だが、認証状態がルーターのライフサイクルに結合している。
 
 ```tsx
-// 現行 React — 3層構造が必要
-const AuthContext = createContext<AuthContextType | null>(null);
-
-export function AuthProvider({ children }) {
-  const { data: user, isLoading } = useSWR('/api/me', fetcher);
-  const { trigger: login }        = useSWRMutation('/api/login', ...);
-  const { trigger: logout }       = useSWRMutation('/api/logout', ...);
-  return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+// 現行 React — rootLoader でルーター経由の認証状態管理
+export async function rootLoader(): Promise<{ user: User | null }> {
+  try {
+    const response = await authApi.getCurrentUser()
+    if (response.success) {
+      return { user: { userId: response.userId, username: response.username } }
+    }
+    return { user: null }
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 401) return { user: null }
+    throw error
+  }
 }
-export const useAuth = () => useContext(AuthContext)!;
+
+// Layout: const { user } = useLoaderData()
+// 子ルート: const { user } = useRouteLoaderData('root')
 ```
 
 ```ts
@@ -94,17 +96,20 @@ export async function logout() {
 {/if}
 ```
 
-Svelte 5 では `.svelte.ts` 拡張子を持つファイル内で Rune（`$state` 等）をコンポーネント外で使える。これが「ユニバーサルリアクティビティ」と呼ばれる設計変更。React の Hook がコンポーネント内でしか呼び出せない制約——「グローバル状態には Provider が必要」という強制——をコンパイラが解消する。
+Svelte 5 では `.svelte.ts` 拡張子を持つファイル内で Rune（`$state` 等）をコンポーネント外で使える。これが「ユニバーサルリアクティビティ」と呼ばれる設計変更。React Router Data モードでは Provider/Context こそ不要になったが、認証状態はルーターの `loader` に組み込まれている。Svelte の `.svelte.ts` はルーターやコンポーネントツリーとは完全に独立した状態管理を可能にする。
 
 SolidJS のモジュールレベル Signal と最終結果は同じだが、手段が異なる。SolidJS は「Signal はただの JavaScript の値であり、どこでも使える」という**ランタイムの設計**。Svelte は「`.svelte.ts` ファイルをコンパイル対象に広げる」という**コンパイラの設計**。
 
 #### URL パラメータとデータ取得の連動 — SvelteKit load 関数
 
 ```tsx
-// 現行 React — SWR のキャッシュキー変化を経由して間接的に連動
-const [searchParams] = useSearchParams();
-const page = Number(searchParams.get('page') ?? '1');
-const { data: posts } = useSWR(`/api/posts?page=${page}`, fetcher);
+// 現行 React — loader が request.url から直接 searchParams を取得
+export async function postsLoader({ request }: { request: Request }) {
+  const url = new URL(request.url)
+  const page = parseInt(url.searchParams.get('page') || '0', 10)
+  const size = parseInt(url.searchParams.get('size') || '10', 10)
+  return postApi.list({ page, size })
+}
 ```
 
 ```ts
@@ -131,17 +136,23 @@ export const load: PageServerLoad = async ({ url }) => {
 {/each}
 ```
 
-SvelteKit の `load` 関数はルート遷移と**並行して**フェッチを開始する。現行の Data モードでも `loader` が同じ役割を担うため、フェッチタイミングの観点では差がない。SvelteKit との本質的な違いは、`+page.server.ts` を使った SSR/SSG 構成ではこの `load` 関数がサーバー側でも実行される点にある。純粋な SPA として動かす場合は `+page.ts`（クライアントサイド load）を使うことになり、SWR に近い構成になる。
+SvelteKit の `load` 関数はルート遷移と**並行して**フェッチを開始する。現行の React Router `loader` も同じ役割を担うため、フェッチタイミングの観点では差がない。SvelteKit との本質的な違いは、`+page.server.ts` を使った SSR/SSG 構成ではこの `load` 関数がサーバー側でも実行される点にある。純粋な SPA として動かす場合は `+page.ts`（クライアントサイド load）を使うことになり、React Router の loader に近い構成になる。
 
-#### 複数 Mutation の状態合成 — `$derived` で依存追跡が自動になる
+#### 複数 Mutation の状態管理 — `$derived` で操作ごとの状態を区別できる
 
 ```tsx
-// 現行 React — isMutating と error を手動合成
-const { trigger: update, isMutating: isUpdating, error: updateError } = useSWRMutation(...);
-const { trigger: remove, isMutating: isDeleting, error: deleteError } = useSWRMutation(...);
+// 現行 React — action + intent パターン（更新・削除を1つの action で処理）
+export async function updateAction({ request, params }) {
+  const formData = await request.formData()
+  const intent = formData.get('intent')
+  if (intent === 'delete') { /* 削除処理 */ }
+  // 更新処理
+}
 
-const isMutating = isUpdating || isDeleting;
-const error      = updateError ?? deleteError;
+// コンポーネント側 — navigation.state はフォーム全体の状態
+const actionData = useActionData<UpdateActionData>()
+const navigation = useNavigation()
+const isSubmitting = navigation.state === 'submitting'
 ```
 
 ```svelte
@@ -162,7 +173,7 @@ const error      = updateError ?? deleteError;
 <button disabled={isMutating} class="danger">削除</button>
 ```
 
-`$derived` は `useMemo` に近いが、依存配列を書かなくていい。参照した値を自動追跡し、変化があったときだけ再計算する——`watchEffect`（Vue）・`createMemo`（SolidJS）と同じ設計。TanStack Query for Svelte は現在もストアベースの API を返すため、テンプレート内では `$` 自動購読構文（`$updateMutation.isPending`）でアクセスする。
+React Router の intent パターンでは `navigation.state` がフォーム全体に対する状態であり、「更新中か削除中か」の区別がつかない。Svelte で個別の Mutation を管理すれば、操作ごとの loading / error 状態が分離する。`$derived` は `useMemo` に近いが、依存配列を書かなくていい。参照した値を自動追跡し、変化があったときだけ再計算する——`watchEffect`（Vue）・`createMemo`（SolidJS）と同じ設計。TanStack Query for Svelte は現在もストアベースの API を返すため、テンプレート内では `$` 自動購読構文（`$updateMutation.isPending`）でアクセスする。
 
 ---
 
