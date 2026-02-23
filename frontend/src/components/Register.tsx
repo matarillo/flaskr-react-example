@@ -1,27 +1,32 @@
-import { type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { Form, useActionData, useNavigation, redirect } from 'react-router'
 import { isAxiosError } from 'axios'
-import { useAuth } from '../contexts/auth'
+import { authApi } from '../api/auth'
 import type { AuthErrorResponse } from '../types/auth'
 
-function Register() {
-  const navigate = useNavigate()
-  const { register, isMutating, error } = useAuth()
+type RegisterActionData = { error: string }
 
-  const errorMessage = error
-    ? (isAxiosError<AuthErrorResponse>(error) && error.response?.data?.message) || 'Registration failed. Please try again.'
-    : null
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    const username = formData.get('username') as string
-    const password = formData.get('password') as string
-    const result = await register({ username, password })
-    if (result) {
-      navigate('/')
-    }
+export async function registerAction({ request }: { request: Request }) {
+  const formData = await request.formData()
+  const credentials = {
+    username: formData.get('username') as string,
+    password: formData.get('password') as string,
   }
+  try {
+    await authApi.register(credentials)
+    await authApi.login(credentials)
+    return redirect('/')
+  } catch (error) {
+    if (isAxiosError<AuthErrorResponse>(error) && error.response?.data?.message) {
+      return { error: error.response.data.message }
+    }
+    return { error: 'Registration failed. Please try again.' }
+  }
+}
+
+function Register() {
+  const actionData = useActionData<RegisterActionData>()
+  const navigation = useNavigation()
+  const isSubmitting = navigation.state === 'submitting'
 
   return (
     <>
@@ -29,9 +34,9 @@ function Register() {
       <header>
         <h1>Register</h1>
       </header>
-      {isMutating && <div className="flash">登録中...</div>}
-      {errorMessage && <div className="flash">{errorMessage}</div>}
-      <form onSubmit={handleSubmit}>
+      {isSubmitting && <div className="flash">登録中...</div>}
+      {actionData?.error && <div className="flash">{actionData.error}</div>}
+      <Form method="post">
         <label htmlFor="username">Username</label>
         <input
           name="username"
@@ -45,10 +50,10 @@ function Register() {
           id="password"
           required
         />
-        <input type="submit" value="Register" disabled={isMutating} />
-      </form>
+        <input type="submit" value="Register" disabled={isSubmitting} />
+      </Form>
     </>
-  );
+  )
 }
 
-export default Register;
+export default Register

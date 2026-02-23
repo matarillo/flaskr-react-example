@@ -1,29 +1,31 @@
-import { type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
-import { useAuth } from '../contexts/auth'
+import { Form, useActionData, useNavigation, redirect } from 'react-router'
 import { isAxiosError } from 'axios'
+import { authApi } from '../api/auth'
 import type { AuthErrorResponse } from '../types/auth'
 import './Login.css'
 
-function Login() {
-  const { login, isMutating, error } = useAuth()
-  const navigate = useNavigate()
+type LoginActionData = { error: string }
 
-  const errorMessage = error
-    ? (isAxiosError<AuthErrorResponse>(error) && error.response?.data?.message) || 'Login failed. Please check your credentials.'
-    : null
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    const result = await login({
+export async function loginAction({ request }: { request: Request }) {
+  const formData = await request.formData()
+  try {
+    await authApi.login({
       username: formData.get('username') as string,
       password: formData.get('password') as string,
     })
-    if (result) {
-      navigate('/')
+    return redirect('/')
+  } catch (error) {
+    if (isAxiosError<AuthErrorResponse>(error) && error.response?.data?.message) {
+      return { error: error.response.data.message }
     }
+    return { error: 'Login failed. Please check your credentials.' }
   }
+}
+
+function Login() {
+  const actionData = useActionData<LoginActionData>()
+  const navigation = useNavigation()
+  const isSubmitting = navigation.state === 'submitting'
 
   return (
     <>
@@ -31,9 +33,9 @@ function Login() {
       <header>
         <h1>Log In</h1>
       </header>
-      {isMutating && <div className="flash">ログイン中...</div>}
-      {errorMessage && <div className="flash">{errorMessage}</div>}
-      <form onSubmit={handleSubmit}>
+      {isSubmitting && <div className="flash">ログイン中...</div>}
+      {actionData?.error && <div className="flash">{actionData.error}</div>}
+      <Form method="post">
         <label htmlFor="username">Username</label>
         <input
           name="username"
@@ -47,8 +49,8 @@ function Login() {
           id="password"
           required
         />
-        <input type="submit" value="Log In" disabled={isMutating} />
-      </form>
+        <input type="submit" value="Log In" disabled={isSubmitting} />
+      </Form>
     </>
   )
 }

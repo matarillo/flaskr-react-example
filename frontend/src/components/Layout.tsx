@@ -1,8 +1,10 @@
-import { Link, Outlet } from "react-router";
-import { useAuth } from '../contexts/auth'
+import { Link, Outlet, useLoaderData, useFetcher } from 'react-router'
+import type { User } from '../types/auth'
 
 function Layout() {
-  const { user, logout, isMutating } = useAuth()
+  const { user } = useLoaderData() as { user: User | null }
+  const fetcher = useFetcher()
+  const isLoggingOut = fetcher.state !== 'idle'
 
   return (
     <>
@@ -15,10 +17,10 @@ function Layout() {
               <li>
                 <button
                   type="button"
-                  onClick={() => logout()}
-                  disabled={isMutating}
+                  onClick={() => fetcher.submit(null, { method: 'post', action: '/logout' })}
+                  disabled={isLoggingOut}
                   className="anchor"
-                  style={{ cursor: isMutating ? 'not-allowed' : 'pointer' }}
+                  style={{ cursor: isLoggingOut ? 'not-allowed' : 'pointer' }}
                 >
                   Log Out
                 </button>

@@ -1,12 +1,12 @@
-import { type FormEvent, type ReactNode } from 'react'
-import { useNavigate, useLoaderData, useParams, redirect } from 'react-router'
-import useSWRMutation from 'swr/mutation'
+import { type ReactNode } from 'react'
+import { Form, useActionData, useNavigation, useLoaderData, redirect } from 'react-router'
 import { isAxiosError } from 'axios'
 import { authApi } from '../api/auth'
 import { postApi } from '../api/post'
 import type { PostErrorResponse, FindPostResponse } from '../types/post'
 
 type UpdateLoaderData = { post: FindPostResponse | null }
+type UpdateActionData = { error: string }
 
 // 認証失敗 → リダイレクト、404 → { post: null }、その他エラー → errorElement へ伝播
 export async function updateLoader(
@@ -34,66 +34,56 @@ export async function updateLoader(
   }
 }
 
+export async function updateAction(
+  { request, params }: { request: Request; params: { id?: string } }
+) {
+  const formData = await request.formData()
+  const intent = formData.get('intent')
+  const id = Number(params.id)
+
+  if (intent === 'delete') {
+    try {
+      await postApi.delete({ id })
+      return redirect('/')
+    } catch (error) {
+      if (isAxiosError<PostErrorResponse>(error) && error.response?.data?.message) {
+        return { error: error.response.data.message }
+      }
+      return { error: '投稿の削除に失敗しました' }
+    }
+  }
+
+  // intent === 'update'
+  try {
+    await postApi.update({
+      id,
+      title: formData.get('title') as string,
+      body: formData.get('body') as string,
+    })
+    return redirect('/')
+  } catch (error) {
+    if (isAxiosError<PostErrorResponse>(error) && error.response?.data?.message) {
+      return { error: error.response.data.message }
+    }
+    return { error: '投稿の更新に失敗しました' }
+  }
+}
+
 type UpdateFormProps = {
   post: FindPostResponse
 }
 
 function UpdateForm({ post }: UpdateFormProps) {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-
-  const { trigger: updateTrigger, isMutating: isUpdating, error: updateError } = useSWRMutation(
-    `posts/${id}/update`,
-    async (_, { arg }: { arg: { title: string; body: string } }) => {
-      await postApi.update({ id: Number(id), ...arg })
-    },
-    {
-      onSuccess: () => {
-        navigate('/')
-      },
-    }
-  )
-
-  // update と delete でキーを分けることで isMutating 状態が独立する
-  const { trigger: deleteTrigger, isMutating: isDeleting, error: deleteError } = useSWRMutation(
-    `posts/${id}/delete`,
-    async () => {
-      await postApi.delete({ id: Number(id) })
-    },
-    {
-      onSuccess: () => {
-        navigate('/')
-      },
-      revalidate: false,
-    }
-  )
-
-  const error = updateError || deleteError
-  const errorMessage = error
-    ? (isAxiosError<PostErrorResponse>(error) && error.response?.data?.message) || '投稿の更新に失敗しました'
-    : null
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    await updateTrigger({
-      title: formData.get('title') as string,
-      body: formData.get('body') as string,
-    })
-  }
-
-  const handleDelete = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (window.confirm('本当に削除しますか？')) {
-      await deleteTrigger()
-    }
-  }
+  const actionData = useActionData<UpdateActionData>()
+  const navigation = useNavigation()
+  const isSubmitting = navigation.state === 'submitting'
 
   return (
     <>
-      {(isUpdating || isDeleting) && <div className="flash">送信中...</div>}
-      {errorMessage && <div className="flash">{errorMessage}</div>}
-      <form onSubmit={handleSubmit}>
+      {isSubmitting && <div className="flash">送信中...</div>}
+      {actionData?.error && <div className="flash">{actionData.error}</div>}
+      <Form method="post">
+        <input type="hidden" name="intent" value="update" />
         <label htmlFor="title">Title</label>
         <input
           name="title"
@@ -107,12 +97,18 @@ function UpdateForm({ post }: UpdateFormProps) {
           id="body"
           defaultValue={post.body}
         ></textarea>
-        <input type="submit" value="Save" disabled={isUpdating || isDeleting} />
-      </form>
+        <input type="submit" value="Save" disabled={isSubmitting} />
+      </Form>
       <hr />
-      <form onSubmit={handleDelete}>
-        <input className="danger" type="submit" value="Delete" disabled={isUpdating || isDeleting} />
-      </form>
+      <Form
+        method="post"
+        onSubmit={(e) => {
+          if (!window.confirm('本当に削除しますか？')) e.preventDefault()
+        }}
+      >
+        <input type="hidden" name="intent" value="delete" />
+        <input className="danger" type="submit" value="Delete" disabled={isSubmitting} />
+      </Form>
     </>
   )
 }

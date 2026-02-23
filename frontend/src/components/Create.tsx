@@ -1,37 +1,30 @@
-import { type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
-import useSWRMutation from 'swr/mutation'
+import { Form, useActionData, useNavigation, redirect } from 'react-router'
 import { isAxiosError } from 'axios'
 import { postApi } from '../api/post'
 import type { PostErrorResponse } from '../types/post'
 
-function Create() {
-  const navigate = useNavigate()
+type CreateActionData = { error: string }
 
-  const { trigger, isMutating, error } = useSWRMutation(
-    'posts',
-    async (_, { arg }: { arg: { title: string; body: string } }) => {
-      await postApi.create(arg)
-    },
-    {
-      onSuccess: () => {
-        navigate('/')
-      },
-    }
-  )
-
-  const errorMessage = error
-    ? (isAxiosError<PostErrorResponse>(error) && error.response?.data?.message) || '投稿の作成に失敗しました'
-    : null
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const formData = new FormData(e.currentTarget)
-    await trigger({
+export async function createAction({ request }: { request: Request }) {
+  const formData = await request.formData()
+  try {
+    await postApi.create({
       title: formData.get('title') as string,
       body: formData.get('body') as string,
     })
+    return redirect('/')
+  } catch (error) {
+    if (isAxiosError<PostErrorResponse>(error) && error.response?.data?.message) {
+      return { error: error.response.data.message }
+    }
+    return { error: '投稿の作成に失敗しました' }
   }
+}
+
+function Create() {
+  const actionData = useActionData<CreateActionData>()
+  const navigation = useNavigation()
+  const isSubmitting = navigation.state === 'submitting'
 
   return (
     <>
@@ -39,9 +32,9 @@ function Create() {
       <header>
         <h1>New Post</h1>
       </header>
-      {isMutating && <div className="flash">送信中...</div>}
-      {errorMessage && <div className="flash">{errorMessage}</div>}
-      <form method="post" onSubmit={handleSubmit}>
+      {isSubmitting && <div className="flash">送信中...</div>}
+      {actionData?.error && <div className="flash">{actionData.error}</div>}
+      <Form method="post">
         <label htmlFor="title">Title</label>
         <input
           name="title"
@@ -53,10 +46,10 @@ function Create() {
           name="body"
           id="body"
         ></textarea>
-        <input type="submit" value="Save" disabled={isMutating} />
-      </form>
+        <input type="submit" value="Save" disabled={isSubmitting} />
+      </Form>
     </>
   )
 }
 
-export default Create;
+export default Create

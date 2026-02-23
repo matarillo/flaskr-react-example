@@ -1,9 +1,11 @@
-import { Link } from "react-router";
-import { useAuth } from "../contexts/auth";
-import PostList from "./PostList";
+import { Link, useLoaderData, useRouteLoaderData } from 'react-router'
+import type { User } from '../types/auth'
+import type { ListPostsResponse } from '../types/post'
+import PostList from './PostList'
 
 function Home() {
-  const { user } = useAuth();
+  const { user } = useRouteLoaderData('root') as { user: User | null }
+  const data = useLoaderData() as ListPostsResponse
 
   return (
     <>
@@ -12,9 +14,9 @@ function Home() {
         <h1>Posts</h1>
         {user && <Link className="action" to="/create">New</Link>}
       </header>
-      <PostList />
+      <PostList data={data} />
     </>
-  );
+  )
 }
 
-export default Home;
+export default Home
