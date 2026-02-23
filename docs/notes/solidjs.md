@@ -22,7 +22,7 @@ README に記載した技術トレンドの多くが React を前提にした整
 | `useContext` + SWR | モジュールレベルの Signal | 大（Provider 不要になることが多い） |
 | SWR | `createResource`（組み込み）/ TanStack Query for Solid | 中 |
 | Zustand / Jotai | `createStore`（組み込み） | 大（外部ライブラリ不要） |
-| React Router v7 Declarative | `@solidjs/router` | 小（構造は近い） |
+| React Router v7 Data | `@solidjs/router` | 小（構造は近い） |
 | Vitest + MSW | そのまま使える | なし |
 | Vite | そのまま使える | なし |
 
@@ -136,7 +136,7 @@ README では React の設計都合から状態を4層に分類した。SolidJS 
 
 ### ルーティング設計
 
-`@solidjs/router` は React Router v7 Declarative と構造が近く、置き換えコストは低い。`load` 関数でルート単位のデータフェッチも組み込みでできるため、「描画前データ取得ができない」問題も SolidStart を使えばフレームワークレベルで解決できる。
+`@solidjs/router` は React Router v7 Data と構造が近く、置き換えコストは低い。`load` 関数でルート単位のデータフェッチが組み込みでできる点も Data モードの `loader` と対応している。
 
 ただし SolidStart は 2024 年に 1.0 到達したばかりで、Next.js と同列に語れる成熟度ではまだない。
 

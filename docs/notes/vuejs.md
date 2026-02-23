@@ -22,7 +22,7 @@ SolidJS 考察と同じ問いを Vue に向けた整理。Vue と SolidJS はど
 | `useContext` + SWR | Pinia store | 大（Provider 不要になることが多い） |
 | SWR | TanStack Query for Vue / VueUse `useFetch` | 中 |
 | Zustand / Jotai | Pinia（公式）| 大（外部ライブラリが公式に統合されている）|
-| React Router v7 Declarative | Vue Router | 小（構造は近い） |
+| React Router v7 Data | Vue Router | 小（構造は近い） |
 | Vitest + MSW | そのまま使える | なし |
 | Vite | そのまま使える | なし |
 | JSX / `.tsx` | SFC（`.vue` ファイル） | **大（テンプレート構文に変わる）** |

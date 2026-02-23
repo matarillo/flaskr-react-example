@@ -51,6 +51,7 @@ posts / create / update # 投稿 CRUD の実装
 refactor to SWR         # データフェッチを SWR に置き換え
 fix routing             # ルーティング修正
 refactor（複数回）      # コード整理
+migrate to Data Router  # React Router を Declarative → Data モードへ移行
 ```
 
 ### 技術選定の考察
@@ -60,7 +61,7 @@ refactor（複数回）      # コード整理
 | **SWR** | ルーティングとデータ取得を別レイヤーで管理する構成を試したかった。`useSWR` でキャッシュ、`useSWRMutation` でログイン・ログアウトを実装 |
 | **セッション認証** | JWT ではなく Cookie ベースの認証フローを Spring Security で実装し、`withCredentials` によるクロスオリジン送信を確認する |
 | **Spring Data JDBC** | JPA より明示的で SQL に近い ORM を試す。`AggregateReference` による外部キー表現も確認 |
-| **React Router v7 Declarative** | SWR にデータ取得を任せる構成では、ルーターにデータレイヤーを持たせない Declarative モードと相性が良い |
+| **React Router v7 Data** | `loader` でレンダリング前に認証チェック・データ取得を完了させる構成を試す。SWR と役割を分担しつつ、認証フラッシュとウォーターフォールを排除する |
 | **Vitest + MSW** | Vite ネイティブのテスト環境と API モックを組み合わせたフロントエンドテストを試す |
 | **SonarQube / JaCoCo** | バックエンド・フロントエンドの静的解析とカバレッジ計測を CI に組み込む |
 
@@ -96,27 +97,22 @@ React の状態管理を4層に分類するモデルがある。このプロジ�
 
 | モード | API | 特徴 |
 |--------|-----|------|
-| **Declarative** ← 本プロジェクト | `BrowserRouter` + `Routes` + `Route` | 基本ルーティングのみ。独自のデータレイヤーと組み合わせやすい |
-| **Data** | `createBrowserRouter` + `RouterProvider` | `loader` / `action` でルート単位のデータ取得・処理が可能 |
+| **Declarative** | `BrowserRouter` + `Routes` + `Route` | 基本ルーティングのみ。独自のデータレイヤーと組み合わせやすい |
+| **Data** ← 本プロジェクト | `createBrowserRouter` + `RouterProvider` | `loader` / `action` でルート単位のデータ取得・処理が可能 |
 | **Framework** | `routes.ts` による設定ファイル | SSR、型安全 href、自動コード分割など最フル機能 |
 
 Declarative モードでは `<Link to="...">` や `useParams()` に型が付かない。存在しないパスを渡しても、パラメータ名を間違えてもコンパイルエラーにならずランタイムまで気づけない。
 
-#### ルーティングとデータ取得を分離する構成のトレードオフ
+#### ルーティングとデータ取得の役割分担
 
-本プロジェクトは Declarative Router + SWR を独立したレイヤーとして組み合わせている。
+本プロジェクトは Data Router + SWR を組み合わせた構成を採用している。
 
-メリット：各ライブラリが単一責任を持ち入れ替えが容易 / データ取得の流れをコードレベルで明示的に追える / ルーティングとキャッシュ戦略を独立して最適化できる
+- **loader**：レンダリング前に認証チェックとデータ取得を担う。未認証はリダイレクト、404 は `{ post: null }` を返してコンポーネントへ委譲、その他エラーは `errorElement` で処理する
+- **SWR**：Mutation 後のキャッシュ管理とグローバル認証状態を担う。`router.revalidate()` と連携し、ログアウト後に loader を再実行してリダイレクトを発火させる
 
-デメリット：
+Declarative + SWR と比較した変化：認証チェックのフラッシュが解消した / コンポーネントが表示ロジックに集中できる / 一方でデータ取得の責務が loader と SWR に分散するため、「どちらがデータを持つか」の設計判断は依然として必要
 
-- **描画前データ取得ができない** — コンポーネントがマウントされて初めてフェッチが始まるため、ルート遷移のたびにスピナーが出る。Data モードの `loader` はルート解決と並行してフェッチを開始するのでこの問題がない
-- **認証チェックのフラッシュ** — `Create.tsx` / `Update.tsx` で発生している現象。未認証ユーザーに一瞬ページが見えてからリダイレクトされる
-- **キャッシュキー管理が分散する** — ルート定義とデータ取得の対応関係がコードを横断するため、規模が増すと把握しにくくなる
-
-小規模（5〜10 ルート程度）なら上記デメリットは UX 上許容できるケースが多く、構成の単純さと学習効率が優先される。
-
-Data モードや TanStack Router への移行を検討するシグナル：ルート数が増えネストが深くなる / 認証フラッシュが UX 上許容できなくなる / Mutation が複雑になり DevTools が欲しくなる
+Framework モードや TanStack Router への移行を検討するシグナル：ルート数が増えネストが深くなる / ファイルベースルーティングと型安全な `<Link>` が欲しくなる / SSR が必要になる
 
 #### 2025年のカスタムSPAにおけるルーター比較
 
@@ -124,8 +120,8 @@ Data モードや TanStack Router への移行を検討するシグナル：ル�
 |----------|----------|--------------|------------|------|
 | **TanStack Router** | 100%（コンパイル時） | ✅ `routeTree.gen.ts` 自動生成 | ✅ 組み込み | カスタムSPAのデファクトに近い |
 | **React Router v7 Framework** | 部分的 | ✅ `routes.ts` | ✅ loader/action | SSR対応あり |
-| **React Router v7 Data** | なし | ❌ コード定義 | ✅ loader/action | SPA向けの中間選択肢 |
-| **React Router v7 Declarative** ← 本プロジェクト | なし | ❌ コード定義 | ❌ | シンプル・学習向き |
+| **React Router v7 Data** ← 本プロジェクト | なし | ❌ コード定義 | ✅ loader/action | SPA向けの中間選択肢 |
+| **React Router v7 Declarative** | なし | ❌ コード定義 | ❌ | シンプル・学習向き |
 
 #### ファイルベースルーティング
 
@@ -146,10 +142,9 @@ Data モードや TanStack Router への移行を検討するシグナル：ル�
 
 ### ライブラリの追加・変更を伴う
 
-5. **React Router Data モード** — `createBrowserRouter` + `loader` を導入することで2つの問題を同時に解決できる：ルート遷移と並行してデータフェッチを開始する（ウォーターフォール排除）/ 認証チェックをレンダリング前に完了してフラッシュを防ぐ（`App.tsx` 内にすでにメモあり）
-6. **Zustand / Jotai によるグローバルUI状態の分離** — `contexts/auth.tsx` で混在している SWR（サーバー状態）と Context（グローバルUI状態）を切り離し、4層の境界を明確にする。現状の小規模アプリでは Context で十分なため、規模が増してから検討する方が学びが大きい
-7. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。SWR との相性も良い。Suspense を使ったデータフェッチのローディング体験統合は SWR より TanStack Query + TanStack Router の組み合わせで実現しやすい
-8. **React Router Framework モード** — `routes.ts` によるファイルベースルーティングを試す
+5. **Zustand / Jotai によるグローバルUI状態の分離** — `contexts/auth.tsx` で混在している SWR（サーバー状態）と Context（グローバルUI状態）を切り離し、4層の境界を明確にする。現状の小規模アプリでは Context で十分なため、規模が増してから検討する方が学びが大きい
+6. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。SWR との相性も良い。Suspense を使ったデータフェッチのローディング体験統合は SWR より TanStack Query + TanStack Router の組み合わせで実現しやすい
+7. **React Router Framework モード** — `routes.ts` によるファイルベースルーティングを試す
 
 ## 起動方法
 

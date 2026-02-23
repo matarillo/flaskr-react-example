@@ -22,7 +22,7 @@ SolidJS・Vue の考察と同じ問いを Svelte に向けた整理。Svelte は
 | `useContext` + SWR | `.svelte.ts` のモジュールレベル `$state` | 大（Provider 不要） |
 | SWR | TanStack Query for Svelte / SvelteKit `load` | 中 |
 | Zustand / Jotai | `.svelte.ts` の `$state`（外部ライブラリ不要） | 大 |
-| React Router v7 Declarative | SvelteKit（ファイルベース） | **大（構造が全く変わる）** |
+| React Router v7 Data | SvelteKit（ファイルベース） | **大（構造が全く変わる）** |
 | Vitest + MSW | そのまま使える | なし |
 | Vite | SvelteKit が内包（設定変更あり） | 小 |
 | JSX / `.tsx` | SFC（`.svelte` ファイル） | **大（テンプレート構文に変わる）** |
@@ -131,7 +131,7 @@ export const load: PageServerLoad = async ({ url }) => {
 {/each}
 ```
 
-SvelteKit の `load` 関数はルート遷移と**並行して**フェッチを開始する。React Router v7 Declarative が抱えていた「コンポーネントがマウントされて初めてフェッチが始まる（スピナーが出る）」という問題がアーキテクチャレベルで解消されている。ただしこれは `+page.server.ts` を使った SSR/SSG 構成での話。純粋な SPA として動かす場合は `+page.ts`（クライアントサイド load）を使うことになり、SWR に近い構成になる。
+SvelteKit の `load` 関数はルート遷移と**並行して**フェッチを開始する。現行の Data モードでも `loader` が同じ役割を担うため、フェッチタイミングの観点では差がない。SvelteKit との本質的な違いは、`+page.server.ts` を使った SSR/SSG 構成ではこの `load` 関数がサーバー側でも実行される点にある。純粋な SPA として動かす場合は `+page.ts`（クライアントサイド load）を使うことになり、SWR に近い構成になる。
 
 #### 複数 Mutation の状態合成 — `$derived` で依存追跡が自動になる
 
@@ -191,7 +191,7 @@ React の「イミュータブル更新」という精神的負荷が、Svelte �
 
 ### ルーティング設計
 
-SvelteKit のファイル構成は React Router v7 Declarative とは大きく異なる：
+SvelteKit のファイル構成は React Router v7 Data とは大きく異なる：
 
 ```
 routes/
@@ -213,7 +213,7 @@ routes/
 
 `+page.server.ts` の `actions` は `<form>` と連携したサーバーサイドミューテーションを実現し、JavaScript なしでも動作する Progressive Enhancement を設計の一部に持っている。これは React Router Data モードの `action` に相当するが、SSR・CSR・Form Actions が一体化している点が違う。
 
-型安全性については、SvelteKit が自動生成する `./$types` から `PageData` / `PageServerLoad` 等の型が使えるため、ルートのデータ型が end-to-end で保証される。React Router v7 Declarative が抱えていた「`<Link to="...">` に型が付かない」問題も解消している。
+型安全性については、SvelteKit が自動生成する `./$types` から `PageData` / `PageServerLoad` 等の型が使えるため、ルートのデータ型が end-to-end で保証される。React Router v7 Data が抱える「`<Link to="...">` に型が付かない」問題も解消している。
 
 ---
 
@@ -400,7 +400,7 @@ export const actions = {
 
 ## 判断
 
-このプロジェクトの規模（5〜10 ルート、シンプル CRUD）で Svelte を試すことは技術的に筋が通っている。特に SvelteKit の `+page.server.ts` + `load` 関数の構成は、現行の Declarative Router + SWR が持つ「描画前データ取得ができない」「認証チェックのフラッシュ」という2つの問題をアーキテクチャレベルで解消する——これは現行構成の課題への**直接的な回答**として体験する価値がある。
+このプロジェクトの規模（5〜10 ルート、シンプル CRUD）で Svelte を試すことは技術的に筋が通っている。ただし、以前の Declarative Router + SWR 構成で挙げていた「描画前データ取得ができない」「認証チェックのフラッシュ」という2つの問題は、Data モードへの移行によりすでに解消した。SvelteKit を試す価値があるとすれば、ファイルベースルーティングの体験・SSR/SSG との連携・Form Actions による Progressive Enhancement という、現行構成では体験できない領域に絞られる。
 
 一方で「React の代替として採用する」ための動機はまだない：
 
@@ -412,4 +412,4 @@ export const actions = {
 
 **Vue 考察との比較**：Vue は「テンプレート・二重パラダイム・`.value`」という学習コスト、Svelte は「`$` シジルのルール・コンパイラへの依存・SvelteKit 特有の命名規則」という別種の学習コスト。どちらが楽かはバックグラウンドによる。国内の実務案件への接続という点では Vue に軍配が上がる。
 
-**現時点の結論：** 学習目的で別ブランチに実装して比較するなら価値がある。SvelteKit の load 関数・form actions を体験するのは現行構成の課題への直接的な対案として参考になる。本番スタックの変更を検討するなら、Runes エコシステムの安定と TypeScript 統合の改善を確認してから ADR に昇格させる。
+**現時点の結論：** 学習目的で別ブランチに実装して比較するなら価値がある。SvelteKit の form actions・SSR/SSG 連携・Progressive Enhancement を体験する目的では比較対象として参考になる。本番スタックの変更を検討するなら、Runes エコシステムの安定と TypeScript 統合の改善を確認してから ADR に昇格させる。
