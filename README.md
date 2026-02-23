@@ -81,18 +81,18 @@ React の状態は**所在とスコープ**によって4層に分類できる（
 
 #### ミューテーションとフォーム状態の位置づけ
 
-ミューテーション（データの作成・更新・削除）は状態の「層」ではなく、Server State を変更する**操作**である。同様にフォーム状態は Local State の一種である。ただしミューテーションには固有のライフサイクル（送信中・成功・エラー）が伴うため、設計上の独立した考慮が必要になる。
+ミューテーション（データの作成・更新・削除）は Server State を変更する**操作**であり、操作自体は上記4層のいずれにも該当しない。ただし操作には送信中・成功・エラーといったライフサイクルが伴い、その一時的な UI 状態の管理が設計上の独立した関心事になる。フォーム状態（入力中の値）は Local State に分類されるが、React Router の `<Form>` では非制御コンポーネントとして DOM が値を保持するため、`useState` による明示的な管理は不要になっている。ただしクライアントサイドのバリデーション（即時フィードバック、入力中のエラー表示）が必要になれば、フォーム状態の管理は再び設計上の関心事になる（実験候補 #4）。
 
 | 関心事 | 本プロジェクトでの実装 |
 |--------|----------------------|
 | ミューテーション実行 | React Router `action` + `<Form method="post">` |
-| 再検証 | action 完了後に loader が自動再実行（`<Form>` / `useFetcher` いずれも）。`useRevalidator` による明示的な再実行も可能。手動キャッシュ無効化が不要 |
-| フォーム入力管理 | `<Form>` の name 属性（非制御）。React Router が FormData を管理するため `useState` 不要 |
+| 再検証 | action 完了後に loader が自動再実行。手動キャッシュ無効化が不要（詳細は設計パターン節を参照） |
+| フォーム入力管理 | `<Form>` の name 属性（非制御）。React Router が FormData を管理 |
 | エラーハンドリング | action が `{ error }` を返し、`useActionData()` で表示 |
 
-React Router Data モードでは Server State の取得（loader）と変更（action）がルーター層で一元化され、ミューテーション後のデータ整合性をフレームワークが保証する。
+この設計により、Server State の取得（loader）と変更（action）がルーター層で一元化され、ミューテーション後のデータ整合性をフレームワークが保証する。ミューテーションのライフサイクルもフォーム入力の管理も、独立した状態管理層やライブラリを必要としない。
 
-> **React 19 以降の方向性**：`useActionState`・`useFormStatus`・`useOptimistic` の標準化により、ミューテーションのライフサイクル（pending / error / optimistic update）を React 本体が宣言的に扱えるようになった。これらは「ミューテーションという操作に付随する一時的な UI 状態」を管理する API であり、独立した状態層を増やすものではない。
+> **React 19 以降の方向性**：`useActionState`・`useFormStatus`・`useOptimistic` の標準化により、ミューテーションのライフサイクル（pending / error / optimistic update）を React 本体が宣言的に扱えるようになった。本プロジェクトでは未採用だが、実験候補 #1 で検証予定。
 
 #### メモ化（useMemo / React.memo）が不要な理由
 
@@ -192,13 +192,14 @@ React Router Data モード + React 19 の能力と限界を見極める実験�
 1. **`useActionState`（React 19）** — 現在 `useActionData` + `useNavigation` で管理している「送信中か / エラーは何か」を React 19 標準 API に置き換える。最小の API 置換実験
 2. **いいね機能 — ナビゲーションなしの revalidation + `useOptimistic`** — 投稿へのいいねトグルを実装し、`useFetcher` action による URL 変更なしの自動再検証と `useOptimistic` による楽観的 UI を統合的に試す。一覧ページで複数 fetcher が並行動作する状況、1件の変更でルート全体が再取得される revalidation 粒度の制約、連打時の race condition など、Data モードの能力の境界が体感できる
 3. **Suspense + `React.lazy` によるコード分割** — 各ルートコンポーネントを遅延読み込みし Suspense でローディング UI を宣言的に配置する
+4. **フォームバリデーションの追加** — 現在は非制御 `<Form>` + action のサーバーサイドエラー返却のみ。クライアントサイドの即時バリデーションを最小差分で追加するとアーキテクチャがどう変わるかを検証する。HTML5 制約検証（`required`・`pattern`）、action 戻り値によるサーバーバリデーション強化、React Hook Form + Zod による制御コンポーネント化など、段階的なアプローチの比較が可能
 
 ### 代替アーキテクチャの体験
 
 異なるルーティング・データ取得パラダイムとの比較。上記の実験で感じた Data モードの制約が、別のアプローチでどう解決されるかを確認する。
 
-4. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。TanStack Query との組み合わせで、正規化キャッシュによるルート横断のデータ共有や Suspense ベースのローディング統合が実現しやすい
-5. **React Router Framework モード** — `routes.ts` によるファイルベースルーティングを試す
+5. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。TanStack Query との組み合わせで、正規化キャッシュによるルート横断のデータ共有や Suspense ベースのローディング統合が実現しやすい
+6. **React Router Framework モード** — `routes.ts` によるファイルベースルーティングを試す
 
 ## 起動方法
 
