@@ -1,26 +1,49 @@
 import { type FormEvent, type ReactNode } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router'
-import useSWR from 'swr'
+import { useNavigate, useLoaderData, useParams, redirect } from 'react-router'
 import useSWRMutation from 'swr/mutation'
 import { isAxiosError } from 'axios'
+import { authApi } from '../api/auth'
 import { postApi } from '../api/post'
-import type { PostErrorResponse } from '../types/post'
-import { useAuth } from '../contexts/auth'
+import type { PostErrorResponse, FindPostResponse } from '../types/post'
 
-interface UpdateFormProps {
-  id: string
+type UpdateLoaderData = { post: FindPostResponse | null }
+
+// 認証失敗 → リダイレクト、404 → { post: null }、その他エラー → errorElement へ伝播
+export async function updateLoader(
+  { params }: { params: { id?: string } }
+): Promise<Response | UpdateLoaderData> {
+  const { id } = params
+  if (!id) return redirect('/')
+
+  // 認証チェック
+  try {
+    const authResponse = await authApi.getCurrentUser()
+    if (!authResponse.success) return redirect('/')
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 401) return redirect('/')
+    throw error
+  }
+
+  // 投稿取得: 404 はアプリの正常系なので null を返してコンポーネントへ委譲
+  try {
+    const post = await postApi.find({ id: Number(id) })
+    return { post }
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 404) return { post: null }
+    throw error
+  }
 }
 
-function UpdateForm({ id }: UpdateFormProps) {
+type UpdateFormProps = {
+  post: FindPostResponse
+}
+
+function UpdateForm({ post }: UpdateFormProps) {
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const { data: post, isLoading } = useSWR(
-    `posts/${id}`,
-    () => postApi.find({ id: Number(id) })
-  )
-
   const { trigger: updateTrigger, isMutating: isUpdating, error: updateError } = useSWRMutation(
-    `posts/${id}`,
+    `posts/${id}/update`,
     async (_, { arg }: { arg: { title: string; body: string } }) => {
       await postApi.update({ id: Number(id), ...arg })
     },
@@ -31,17 +54,16 @@ function UpdateForm({ id }: UpdateFormProps) {
     }
   )
 
+  // update と delete でキーを分けることで isMutating 状態が独立する
   const { trigger: deleteTrigger, isMutating: isDeleting, error: deleteError } = useSWRMutation(
-    `posts/${id}`,
+    `posts/${id}/delete`,
     async () => {
       await postApi.delete({ id: Number(id) })
     },
     {
       onSuccess: () => {
-        // 削除成功時は画面遷移のみ行い、リフェッチはHomeコンポーネントで行われる
         navigate('/')
       },
-      // 削除成功時は自動リフェッチを無効化（リソースが存在しないため）
       revalidate: false,
     }
   )
@@ -67,19 +89,11 @@ function UpdateForm({ id }: UpdateFormProps) {
     }
   }
 
-  if (isLoading) {
-    return <div className="flash">読み込み中...</div>
-  }
-
-  if (!post) {
-    return <div className="flash">投稿が見つかりません</div>
-  }
-
   return (
     <>
       {(isUpdating || isDeleting) && <div className="flash">送信中...</div>}
       {errorMessage && <div className="flash">{errorMessage}</div>}
-      <form method="post" onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit}>
         <label htmlFor="title">Title</label>
         <input
           name="title"
@@ -96,42 +110,42 @@ function UpdateForm({ id }: UpdateFormProps) {
         <input type="submit" value="Save" disabled={isUpdating || isDeleting} />
       </form>
       <hr />
-      <form method="post" onSubmit={handleDelete}>
+      <form onSubmit={handleDelete}>
         <input className="danger" type="submit" value="Delete" disabled={isUpdating || isDeleting} />
       </form>
     </>
   )
 }
 
-function Update() {
-  const { user, isLoading: isAuthLoading } = useAuth()
-  const { id } = useParams<{ id: string }>()
-
-  const renderLayout = (content: ReactNode) => (
+function UpdateLayout({ children }: { children: ReactNode }) {
+  return (
     <>
       <title>Edit - Flaskr</title>
       <header>
         <h1>Edit Post</h1>
       </header>
-      {content}
+      {children}
     </>
   )
-
-  // 認証状態の読み込み中は待機
-  if (isAuthLoading) {
-    return renderLayout(<div className="flash">認証確認中...</div>)
-  }
-
-  // 認証されていない場合のみリダイレクト
-  if (!user) return <Navigate to="/" replace />
-
-  // IDが存在しない場合は早期リターン
-  if (!id) {
-    return renderLayout(<div className="flash">無効なURLです</div>)
-  }
-
-  // idが確定したのでUpdateFormに委譲（レイアウトを適用）
-  return renderLayout(<UpdateForm id={id} />)
 }
 
-export default Update;
+export function Update() {
+  const { post } = useLoaderData() as UpdateLoaderData
+
+  return (
+    <UpdateLayout>
+      {post
+        ? <UpdateForm post={post} />
+        : <div className="flash">投稿が見つかりません</div>
+      }
+    </UpdateLayout>
+  )
+}
+
+export function UpdateError() {
+  return (
+    <UpdateLayout>
+      <div className="flash">エラーが発生しました</div>
+    </UpdateLayout>
+  )
+}

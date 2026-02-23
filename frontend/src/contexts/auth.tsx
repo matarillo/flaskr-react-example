@@ -1,4 +1,3 @@
-// contexts/auth.tsx
 import { createContext, useContext, type ReactNode } from 'react'
 import useSWR, { mutate } from 'swr'
 import useSWRMutation from 'swr/mutation'
@@ -39,7 +38,13 @@ const currentUserFetcher = async () => {
   }
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+type AuthProviderProps = {
+  children: ReactNode
+  // ログアウト成功後の通知（例: router.revalidate() でローダーを再実行）
+  onLogout?: () => void
+}
+
+export function AuthProvider({ children, onLogout }: AuthProviderProps) {
   const { data, isLoading, mutate: refresh } = useSWR<User | null>(
     'currentUser',
     currentUserFetcher,
@@ -65,8 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       // 成功時のみcurrentUserキャッシュを更新
       await refresh(user, { revalidate: false })
-      // 認証状態に依存するクエリを再検証
-      // 意図的にawaitせず、バックグラウンドで再フェッチ（画面遷移をブロックしない）
+      // 認証状態に依存するクエリをバックグラウンドで再検証（画面遷移をブロックしない）
       mutate((key) => typeof key === 'string' && key.startsWith('posts'))
       return user
     },
@@ -86,9 +90,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authApi.logout()
       // 成功時のみcurrentUserキャッシュをクリア
       await refresh(null, { revalidate: false })
-      // 認証状態に依存するクエリを再検証
-      // 意図的にawaitせず、バックグラウンドで再フェッチ（画面遷移をブロックしない）
+      // 認証状態に依存するクエリをバックグラウンドで再検証（画面遷移をブロックしない）
       mutate((key) => typeof key === 'string' && key.startsWith('posts'))
+      onLogout?.()
       return null
     },
     {

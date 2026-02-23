@@ -1,45 +1,51 @@
-import { BrowserRouter, Routes, Route } from "react-router";
+import { createBrowserRouter, RouterProvider, redirect } from "react-router";
+import { isAxiosError } from 'axios'
 import { AuthProvider } from '../contexts/auth'
+import { authApi } from '../api/auth'
 import Layout from './Layout'
 import Home from './Home'
 import Login from './Login'
 import Register from './Register'
 import Create from './Create'
-import Update from './Update'
+import { Update, UpdateError, updateLoader } from './Update'
 import './App.css'
+
+// 認証が必要なルート用ローダー: レンダリング前に認証チェックし、未認証はリダイレクト
+const protectedLoader = async () => {
+  try {
+    const response = await authApi.getCurrentUser()
+    if (!response.success) return redirect('/')
+    return null
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 401) return redirect('/')
+    throw error
+  }
+}
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      { index: true, element: <Home /> },
+      { path: 'login', element: <Login /> },
+      { path: 'register', element: <Register /> },
+      { path: 'create', element: <Create />, loader: protectedLoader },
+      {
+        path: 'posts/:id/update',
+        element: <Update />,
+        loader: updateLoader,
+        errorElement: <UpdateError />,
+      },
+    ],
+  },
+])
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-          {/*
-            認証チェック実装メモ:
-            現在: <Navigate>コンポーネントで各ページ内でチェック (Create.tsx, Update.tsx)
-
-            将来的な改善案 (セキュリティ・UX向上のため):
-            1. createBrowserRouter + loader による事前チェックを追加
-            2. コンポーネントレンダリング前にリダイレクト (フラッシュ防止)
-            3. SWR キャッシュとの統合
-
-            実装例:
-            const protectedLoader = async () => {
-              const user = await authApi.getCurrentUser()
-              if (!user || !user.success) throw redirect('/')
-              return null
-            }
-
-            参考: https://reactrouter.com/en/main/route/loader
-          */}
-          <Routes>
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Home />} />
-              <Route path="login" element={<Login />} />
-              <Route path="register" element={<Register />} />
-              <Route path="create" element={<Create />} />
-              <Route path="posts/:id/update" element={<Update />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
+    // ログアウト後にローダーを再実行し、認証が必要なページから自動でリダイレクトさせる
+    <AuthProvider onLogout={() => router.revalidate()}>
+      <RouterProvider router={router} />
     </AuthProvider>
   )
 }
