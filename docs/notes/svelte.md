@@ -174,7 +174,7 @@ const isSubmitting = navigation.state === 'submitting'
 <button disabled={isMutating} class="danger">削除</button>
 ```
 
-React Router の intent パターンでは `navigation.state` がフォーム全体に対する状態であり、「更新中か削除中か」の区別がつかない。Svelte で個別の Mutation を管理すれば、操作ごとの loading / error 状態が分離する。`$derived` は `useMemo` に近いが、依存配列を書かなくていい。参照した値を自動追跡し、変化があったときだけ再計算する——`computed`（Vue）・`createMemo`（SolidJS）と同じ設計（`watchEffect` / `createEffect` は副作用用であり、導出値を返す `$derived` とは役割が異なる）。TanStack Query for Svelte は現在もストアベースの API を返すため、テンプレート内では `$` 自動購読構文（`$updateMutation.isPending`）でアクセスする。
+React Router の intent パターンでは `navigation.state` だけでは「更新中か削除中か」の区別がつかない。ただし `navigation.formData?.get('intent')` を参照すれば送信中の操作を特定でき、`useFetcher` をフォームごとに使えば完全に独立した送信状態も得られるため、React Router Data モードで実現不可能なわけではない。違いは**デフォルトの設計粒度**にある——Svelte + TanStack Query では mutation ごとの状態分離がデフォルトの設計であるのに対し、React Router では意識的に `formData` の検査や `useFetcher` の分離を選ぶ必要がある。`$derived` は `useMemo` に近いが、依存配列を書かなくていい。参照した値を自動追跡し、変化があったときだけ再計算する——`computed`（Vue）・`createMemo`（SolidJS）と同じ設計（`watchEffect` / `createEffect` は副作用用であり、導出値を返す `$derived` とは役割が異なる）。TanStack Query for Svelte は現在もストアベースの API を返すため、テンプレート内では `$` 自動購読構文（`$updateMutation.isPending`）でアクセスする。
 
 ---
 

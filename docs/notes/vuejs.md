@@ -155,7 +155,7 @@ const isMutating = computed(
 </template>
 ```
 
-React Router の intent パターンでは `navigation.state` がフォーム全体に対する状態であり、「更新中か削除中か」の区別がつかない。Vue で個別の Mutation を管理すれば、操作ごとの loading / error 状態が分離する。`computed` が依存関係を自動追跡するため、依存配列の書き忘れという問題も発生しない。テンプレート内では `.value` が自動アンラップされる。
+React Router の intent パターンでは `navigation.state` だけでは「更新中か削除中か」の区別がつかない。ただし `navigation.formData?.get('intent')` を参照すれば送信中の操作を特定でき、`useFetcher` をフォームごとに使えば完全に独立した送信状態も得られるため、React Router Data モードで実現不可能なわけではない。違いは**デフォルトの設計粒度**にある——Vue + TanStack Query では mutation ごとの状態分離がデフォルトの設計であるのに対し、React Router では意識的に `formData` の検査や `useFetcher` の分離を選ぶ必要がある。`computed` が依存関係を自動追跡するため、依存配列の書き忘れという問題も発生しない。テンプレート内では `.value` が自動アンラップされる。
 
 ### React Hooks と Vue Composition API の比較
 

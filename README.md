@@ -153,7 +153,7 @@ Declarative モードでは `<Link to="...">` や `useParams()` に型が付か�
 - **postsLoader**：`request.url` から searchParams を取得しページネーション付きで投稿を取得
 - **protectedLoader**：認証チェックを行い、未認証なら `redirect('/')` を返す
 - **action**：`<Form method="post">` からの送信を受け取り、API 呼び出し後に `redirect('/')` または `{ error }` を返す
-- **intent パターン**：1つのルートで複数の操作（update / delete）を `<input type="hidden" name="intent">` で区別する
+- **intent パターン**：1つのルートで複数の操作（update / delete）を `<input type="hidden" name="intent">` で区別する。`navigation.formData?.get('intent')` を参照すれば送信中の操作を特定でき、`useFetcher` をフォームごとに使えば完全に独立した送信状態も得られる
 - **revalidation**：action 完了後、全アクティブルートの loader が自動で再実行される。手動のキャッシュ無効化は不要。`<Form>` による action はナビゲーションを伴うが、`useFetcher` は URL を変えずに action を実行し同じ自動再検証を得る。`useRevalidator` を使えば action を介さない明示的な再検証も可能
 
 #### 2025年のカスタムSPAにおけるルーター比較

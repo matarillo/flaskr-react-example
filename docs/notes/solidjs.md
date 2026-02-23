@@ -96,7 +96,7 @@ const deleteMutation = createMutation(() => ({ mutationFn: deletePost }));
 <button disabled={deleteMutation.isPending}>Delete</button>
 ```
 
-React Router の intent パターンでは `navigation.state` がフォーム全体に対する状態であり、「更新中か削除中か」の区別がつかない。SolidJS で個別の Mutation を管理すれば、操作ごとの loading / error 状態が分離する。加えて、SolidJS にはコンポーネントの「再レンダリング」という概念がない。コンポーネント関数は初回の1回だけ実行され、Signal が変化したときに **Signal を読んでいる DOM 式だけ**が更新されるため、`useMemo` / `useCallback` / `React.memo` が不要になる——最適化する対象の再実行そのものが起きない設計になっている。
+React Router の intent パターンでは `navigation.state` だけでは「更新中か削除中か」の区別がつかない。ただし `navigation.formData?.get('intent')` を参照すれば送信中の操作を特定でき、`useFetcher` をフォームごとに使えば完全に独立した送信状態も得られるため、React Router Data モードで実現不可能なわけではない。違いは**デフォルトの設計粒度**にある——SolidJS + TanStack Query では mutation ごとの状態分離がデフォルトの設計であるのに対し、React Router では意識的に `formData` の検査や `useFetcher` の分離を選ぶ必要がある。加えて、SolidJS にはコンポーネントの「再レンダリング」という概念がない。コンポーネント関数は初回の1回だけ実行され、Signal が変化したときに **Signal を読んでいる DOM 式だけ**が更新されるため、`useMemo` / `useCallback` / `React.memo` が不要になる——最適化する対象の再実行そのものが起きない設計になっている。
 
 #### URL パラメータとデータ取得の連動 — createResource で宣言的な依存追跡が可能になる
 
