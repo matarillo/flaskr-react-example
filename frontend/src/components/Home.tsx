@@ -2,7 +2,7 @@ import { Link, useLoaderData, useRouteLoaderData } from 'react-router'
 import { postApi } from '../api/post'
 import type { User } from '../types/auth'
 import type { ListPostsResponse } from '../types/post'
-import PostList from './PostList'
+import { PostList } from './PostList'
 
 // 投稿一覧ローダー: searchParams から page/size を取得して API を呼ぶ
 export async function postsLoader({ request }: { request: Request }) {

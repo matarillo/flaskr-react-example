@@ -6,10 +6,10 @@ type PostListProps = {
   data: ListPostsResponse
 }
 
-function PostList({ data }: PostListProps) {
-  const [searchParams, setSearchParams] = useSearchParams();
+export function PostList({ data }: PostListProps) {
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const size = parseInt(searchParams.get('size') || '10', 10);
+  const size = parseInt(searchParams.get('size') || '10', 10)
 
   return (
     <>
@@ -18,12 +18,12 @@ function PostList({ data }: PostListProps) {
           <article className="post">
             <header>
               <div>
-                <h1>{ post.title }</h1>
-                <div className="about">by { post.author.username } on { post.created }</div>
+                <h1>{post.title}</h1>
+                <div className="about">by {post.author.username} on {post.created}</div>
               </div>
-              { post.updateUrl != null && <Link to={`/posts/${post.id}/update`} className='action'>Edit</Link> }
+              {post.updateUrl != null && <Link to={`/posts/${post.id}/update`} className='action'>Edit</Link>}
             </header>
-            <p className="body">{ post.body }</p>
+            <p className="body">{post.body}</p>
           </article>
           {index < data.posts.length - 1 && <hr />}
         </Fragment>
@@ -49,7 +49,5 @@ function PostList({ data }: PostListProps) {
         </button>
       </div>
     </>
-  );
+  )
 }
-
-export default PostList

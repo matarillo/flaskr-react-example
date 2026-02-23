@@ -30,7 +30,7 @@ export const postApi = {
     return data
   },
 
-  find: async( { id }: FindPostRequest): Promise<FindPostResponse> => {
+  find: async ({ id }: FindPostRequest): Promise<FindPostResponse> => {
     const { data } = await api.get<FindPostResponse>(`/${id}`)
     return data
   },
