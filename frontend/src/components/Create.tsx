@@ -21,7 +21,7 @@ export async function createAction({ request }: { request: Request }) {
   }
 }
 
-function Create() {
+export function Create() {
   const actionData = useActionData<CreateActionData>()
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
@@ -51,5 +51,3 @@ function Create() {
     </>
   )
 }
-
-export default Create

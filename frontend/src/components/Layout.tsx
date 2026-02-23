@@ -1,7 +1,29 @@
-import { Link, Outlet, useLoaderData, useFetcher } from 'react-router'
+import { Link, Outlet, useLoaderData, useFetcher, redirect } from 'react-router'
+import { isAxiosError } from 'axios'
+import { authApi } from '../api/auth'
 import type { User } from '../types/auth'
 
-function Layout() {
+// ルートローダー: 認証状態を取得し全ルートに提供する
+export async function rootLoader(): Promise<{ user: User | null }> {
+  try {
+    const response = await authApi.getCurrentUser()
+    if (response.success) {
+      return { user: { userId: response.userId, username: response.username } }
+    }
+    return { user: null }
+  } catch (error) {
+    if (isAxiosError(error) && error.response?.status === 401) return { user: null }
+    throw error
+  }
+}
+
+// ログアウトアクション: セッションを破棄してホームへリダイレクト
+export async function logoutAction() {
+  await authApi.logout()
+  return redirect('/')
+}
+
+export function Layout() {
   const { user } = useLoaderData() as { user: User | null }
   const fetcher = useFetcher()
   const isLoggingOut = fetcher.state !== 'idle'
@@ -40,5 +62,3 @@ function Layout() {
     </>
   )
 }
-
-export default Layout

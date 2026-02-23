@@ -1,8 +1,8 @@
 import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, it, expect, afterEach } from 'vitest'
-import Home from './Home'
-import Layout from './Layout'
+import { Home } from './Home'
+import { Layout } from './Layout'
 import type { Post, ListPostsResponse } from '../types/post'
 
 // テストデータ

@@ -22,7 +22,7 @@ export async function loginAction({ request }: { request: Request }) {
   }
 }
 
-function Login() {
+export function Login() {
   const actionData = useActionData<LoginActionData>()
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
@@ -54,5 +54,3 @@ function Login() {
     </>
   )
 }
-
-export default Login

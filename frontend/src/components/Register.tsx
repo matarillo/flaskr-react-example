@@ -23,7 +23,7 @@ export async function registerAction({ request }: { request: Request }) {
   }
 }
 
-function Register() {
+export function Register() {
   const actionData = useActionData<RegisterActionData>()
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
@@ -55,5 +55,3 @@ function Register() {
     </>
   )
 }
-
-export default Register
