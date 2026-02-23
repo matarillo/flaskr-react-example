@@ -66,16 +66,33 @@ remove SWR              # SWR を廃止し loader/action に完全移行
 
 ### 状態管理の設計
 
-React の状態管理を4層に分類するモデルがある。このプロジェクトでの実装は以下の通り。
+React の状態は**所在とスコープ**によって4層に分類できる（Kent C. Dodds、TanStack、React Router のドキュメントでも類似の分類が用いられている）。
 
-| 層 | 担うもの | 本プロジェクトでの実装 |
+| 層 | スコープ | 本プロジェクトでの実装 |
 |----|---------|----------------------|
-| **サーバー状態** | API から来るデータ | React Router `loader`（投稿一覧・詳細・認証状態） |
-| **ミューテーション** | データの作成・更新・削除 | React Router `action` + `<Form>` |
-| **フォーム状態** | 入力・バリデーション | `<Form>` の name 属性（React Router が FormData を管理） |
-| **ローカル状態** | コンポーネント内 UI | `useState` |
+| **URL State** | URL パス・クエリパラメータに符号化された状態 | ルートパス（`/posts/:id`）、`searchParams`（ページ番号） |
+| **Server State** | サーバー由来のデータ（クライアントはスナップショットを借りている） | React Router `loader`（投稿一覧・詳細・認証状態） |
+| **Global State** | コンポーネントツリー横断の共有クライアント状態 | 該当なし — 後述 |
+| **Local State** | 単一コンポーネント内の UI 状態 | `useState` |
 
-React Router Data モードでは、サーバー状態の取得（loader）と変更（action）がルーター層で一元化される。action 完了後に loader が自動で再実行されるため、手動でのキャッシュ無効化が不要になる。
+この分類の基準は「状態がどこに存在し、誰が所有するか」である。React Router の設計思想では URL を Single Source of Truth として扱い、URL が他の層を駆動する（URL → loader → Server State → UI）。
+
+本プロジェクトでは **Global State が不要**になっている点が特徴的である。認証状態は `rootLoader` でサーバーから取得し `useRouteLoaderData('root')` で参照するため、Context や外部ストア（Redux、Zustand）でのグローバル管理が不要になった。データが URL に紐づく設計では、従来 Global State として管理されていたものの多くが Server State + URL State に吸収される。
+
+#### ミューテーションとフォーム状態の位置づけ
+
+ミューテーション（データの作成・更新・削除）は状態の「層」ではなく、Server State を変更する**操作**である。同様にフォーム状態は Local State の一種である。ただしミューテーションには固有のライフサイクル（送信中・成功・エラー）が伴うため、設計上の独立した考慮が必要になる。
+
+| 関心事 | 本プロジェクトでの実装 |
+|--------|----------------------|
+| ミューテーション実行 | React Router `action` + `<Form method="post">` |
+| 自動再検証 | action 完了後に loader が自動再実行。手動キャッシュ無効化が不要 |
+| フォーム入力管理 | `<Form>` の name 属性（非制御）。React Router が FormData を管理するため `useState` 不要 |
+| エラーハンドリング | action が `{ error }` を返し、`useActionData()` で表示 |
+
+React Router Data モードでは Server State の取得（loader）と変更（action）がルーター層で一元化され、ミューテーション後のデータ整合性をフレームワークが保証する。
+
+> **React 19 以降の方向性**：`useActionState`・`useFormStatus`・`useOptimistic` の標準化により、ミューテーションのライフサイクル（pending / error / optimistic update）を React 本体が宣言的に扱えるようになった。これらは「ミューテーションという操作に付随する一時的な UI 状態」を管理する API であり、独立した状態層を増やすものではない。
 
 #### なぜこのアプリではキャッシュ層が不要か
 

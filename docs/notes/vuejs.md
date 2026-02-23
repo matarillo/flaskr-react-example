@@ -3,6 +3,7 @@
 > 現在のスタック（React 19）を Vue に置き換えた場合どうなるか、という個人的な考察。決定ではない。
 
 作成：2026-02-22
+更新：2026-02-23
 
 ---
 
@@ -78,6 +79,11 @@ export const useAuthStore = defineStore('auth', () => {
     const res = await authApi.login(credentials)
     user.value = { userId: res.userId, username: res.username }
     return user.value
+  }
+
+  async function logout() {
+    await authApi.logout()
+    user.value = null
   }
 
   return { user, isLoading, fetchCurrentUser, login, logout }
@@ -168,14 +174,16 @@ Vue の Composition API は React Hooks にインスパイアされたが、重�
 
 ### 状態管理の4層モデル（Vue 版）
 
-| 層 | 担うもの | Vue での実装 |
-|----|---------|------------|
-| **サーバー状態** | API から来るデータ | TanStack Query for Vue / VueUse `useFetch` |
-| **グローバルUI状態** | 認証状態など | Pinia store |
-| **複雑なネストオブジェクト** | フォーム・ウィザードなど | `reactive()` または Pinia |
-| **フォーム・ローカル状態** | 入力値 | `ref()` / `v-model` |
+README の4層分類（URL State / Server State / Global State / Local State）を Vue で実装する場合：
 
-Pinia が公式に統合されているため、「どのグローバル状態管理を使うか」の選択コストが React より小さい。SolidJS では Signal だけで全層をカバーできる（Zustand / Jotai 不要）のと比べると、Vue は「公式ライブラリが整理されている」という違いがある——不要にはなっていないが、選択は一意。
+| 層 | スコープ | Vue での実装 |
+|----|---------|------------|
+| **URL State** | URL パス・クエリパラメータ | Vue Router の `useRoute()`（リアクティブオブジェクト） |
+| **Server State** | サーバー由来のデータ | TanStack Query for Vue / VueUse `useFetch` |
+| **Global State** | コンポーネントツリー横断の共有状態 | Pinia store |
+| **Local State** | 単一コンポーネント内の UI 状態 | `ref()` / `v-model` |
+
+Pinia が公式に統合されているため、「どのグローバル状態管理を使うか」の選択コストが React より小さい。SolidJS では Signal だけで全層をカバーできる（Zustand / Jotai 不要）のと比べると、Vue は「公式ライブラリが整理されている」という違いがある——不要にはなっていないが、選択は一意。ネストしたオブジェクト状態には `reactive()` が使える。
 
 ---
 
@@ -187,7 +195,7 @@ Pinia が公式に統合されているため、「どのグローバル状態�
 
 Vue 固有の難しさが別に存在する：
 
-- `ref` の `.value` は記述が冗長なだけでなく、テンプレートでは自動アンラップされ `<script setup>` では不要という「文脈依存のルール」が初学者を混乱させる
+- `ref` の `.value` は記述が冗長なだけでなく、`<template>` では自動アンラップされるが `<script setup>` 内では `.value` が必要という「文脈依存のルール」が初学者を混乱させる
 - Options API か Composition API かの選択が常についてまわる。公式ドキュメントは両方を併記しており、チーム内で混在が起きやすい
 - SFC の `.vue` ファイルはテンプレート・スクリプト・スタイルが混在する。TypeScript の型推論はテンプレート内で JSX より精度が落ちる場面がある
 
@@ -200,7 +208,7 @@ Vue 固有の難しさが別に存在する：
 | npm 週間 DL | 約 2,500 万 | 約 500〜600 万 |
 | UI コンポーネントライブラリ | MUI・shadcn/ui 等が豊富 | Vuetify・PrimeVue・shadcn-vue 等 |
 | メタフレームワーク | Next.js（成熟） | Nuxt（成熟） |
-| TanStack 対応 | フル対応 | Query / Router / Form / Table すべて Vue 版あり |
+| TanStack 対応 | フル対応 | Query / Table / Form は Vue 版あり。Router は 2025年末に Vue アダプタが追加されたが初期段階 |
 | 日本国内での採用 | 増加傾向 | **特に多い（Vue 2 資産を持つ企業が多数）** |
 
 グローバルでは React が優勢だが、国内では Vue 2 資産を持つ中規模企業がまだ多く、Vue 2 → Vue 3 移行案件が実在する。このプロジェクトを Vue で実装する実質的な動機があるとすれば「国内実務案件への接続」が最も筋が通っている——「React の代替探し」としての動機は薄い。
@@ -237,7 +245,7 @@ watchEffect(() => console.log(count))
 
 ---
 
-### Vapor Mode（Vue 3.6 目標、2026年2月時点で開発中）
+### Vapor Mode（Vue 3.6 beta、2025年12月にベータリリース）
 
 Vue チームが最も注力している次世代の最適化。**VDOM を廃止し、テンプレートを直接 DOM 操作にコンパイルする**。Part 2 で整理した「VDOM オーバーヘッドへの問題意識」への直接的な回答。
 

@@ -3,6 +3,7 @@
 > 現在のスタック（React 19）を Svelte に置き換えた場合どうなるか、という個人的な考察。決定ではない。
 
 作成：2026-02-22
+更新：2026-02-23
 
 ---
 
@@ -173,20 +174,22 @@ const isSubmitting = navigation.state === 'submitting'
 <button disabled={isMutating} class="danger">削除</button>
 ```
 
-React Router の intent パターンでは `navigation.state` がフォーム全体に対する状態であり、「更新中か削除中か」の区別がつかない。Svelte で個別の Mutation を管理すれば、操作ごとの loading / error 状態が分離する。`$derived` は `useMemo` に近いが、依存配列を書かなくていい。参照した値を自動追跡し、変化があったときだけ再計算する——`watchEffect`（Vue）・`createMemo`（SolidJS）と同じ設計。TanStack Query for Svelte は現在もストアベースの API を返すため、テンプレート内では `$` 自動購読構文（`$updateMutation.isPending`）でアクセスする。
+React Router の intent パターンでは `navigation.state` がフォーム全体に対する状態であり、「更新中か削除中か」の区別がつかない。Svelte で個別の Mutation を管理すれば、操作ごとの loading / error 状態が分離する。`$derived` は `useMemo` に近いが、依存配列を書かなくていい。参照した値を自動追跡し、変化があったときだけ再計算する——`computed`（Vue）・`createMemo`（SolidJS）と同じ設計（`watchEffect` / `createEffect` は副作用用であり、導出値を返す `$derived` とは役割が異なる）。TanStack Query for Svelte は現在もストアベースの API を返すため、テンプレート内では `$` 自動購読構文（`$updateMutation.isPending`）でアクセスする。
 
 ---
 
 ### 状態管理の4層モデル（Svelte 版）
 
-| 層 | 担うもの | Svelte での実装 |
-|----|---------|----------------|
-| **サーバー状態** | API から来るデータ | SvelteKit `load` 関数 / TanStack Query for Svelte |
-| **グローバルUI状態** | 認証状態など | `.svelte.ts` の `$state`（外部ライブラリ不要） |
-| **複雑なネストオブジェクト** | フォーム・ウィザードなど | `$state`（プロキシで深いプロパティも細粒度追跡） |
-| **フォーム・ローカル状態** | 入力値 | `$state` / `bind:value` |
+README の4層分類（URL State / Server State / Global State / Local State）を Svelte で実装する場合：
 
-`$state` をオブジェクトに適用すると、プロキシを通じてネストしたプロパティも細粒度で追跡される。Vue の `reactive()` と同じ仕組みだが、`.value` アクセスが不要な分コードが短くなる。SolidJS の `createStore` に対応する。
+| 層 | スコープ | Svelte での実装 |
+|----|---------|----------------|
+| **URL State** | URL パス・クエリパラメータ | SvelteKit のファイルベースルーティング + `$page.url.searchParams` |
+| **Server State** | サーバー由来のデータ | SvelteKit `load` 関数 / TanStack Query for Svelte |
+| **Global State** | コンポーネントツリー横断の共有状態 | `.svelte.ts` の `$state`（外部ライブラリ不要） |
+| **Local State** | 単一コンポーネント内の UI 状態 | `$state` / `bind:value` |
+
+ネストしたオブジェクト状態には `$state` をオブジェクトに適用すればよい。プロキシを通じて深いプロパティも細粒度で追跡される。Vue の `reactive()` と同じ仕組みだが、`.value` アクセスが不要な分コードが短くなる。SolidJS の `createStore` に対応する。
 
 ```ts
 // ネストオブジェクトの更新
@@ -256,9 +259,9 @@ README の「次の実験候補」を Svelte 視点で見ると：
 
 #### バンドルサイズ信仰
 
-「フレームワークがコンパイルで消えるから軽い」という主張は小規模では正しいが、スケールすると逆転する。
+「フレームワークがコンパイルで消えるから軽い」という主張は Svelte 3/4 では正確だったが、Svelte 5 で事情が変わった。
 
-Svelte はコンポーネントごとにリアクティビティのコードをコンパイル出力に含める。コンポーネント数が少ない段階ではランタイムを持つ React / Vue より軽いが、コンポーネント数が増えるとコンパイル済みコードの総量が増え続け、React / Vue のランタイム共有の恩恵を上回る逆転が起きる——これは Svelte コミュニティで「Svelte のスケーリング問題」として認識されている課題。一般的な CRUD アプリのボトルネックはバンドルサイズでも DOM 操作速度でもない、という前提は React / SolidJS 比較と変わらない。
+Svelte 3/4 はコンポーネントごとにリアクティビティのコードをコンパイル出力に含めていた。コンポーネント数が少ない段階ではランタイムを持つ React / Vue より軽いが、増えるとコンパイル済みコードの総量が React / Vue のランタイム共有の恩恵を上回る——これが「Svelte のスケーリング問題」として知られていた課題。Svelte 5 では Runes の導入に伴い**共有 Signal ランタイム**が追加され、リアクティビティのコードがコンポーネント間で共有されるようになった。実際の大規模移行事例（Svelte Society の報告）では Svelte 4 → 5 で約 55% のバンドルサイズ削減が確認されている。ただし共有ランタイム自体のサイズ（約 5 KB gzip）が最低オーバーヘッドとして存在するため、「コンパイルで消える」という従来の説明は Svelte 5 には当てはまらない。一般的な CRUD アプリのボトルネックはバンドルサイズでも DOM 操作速度でもない、という前提は React / SolidJS 比較と変わらない。
 
 #### エコシステム
 
@@ -267,14 +270,14 @@ Svelte はコンポーネントごとにリアクティビティのコードを�
 | npm 週間 DL | 約 2,500 万 | 約 200〜300 万 |
 | UI コンポーネントライブラリ | MUI・shadcn/ui 等が豊富 | shadcn-svelte・Skeleton・Flowbite Svelte など |
 | メタフレームワーク | Next.js（成熟） | SvelteKit（成熟、Vercel 支援） |
-| TanStack 対応 | フル対応 | Query / Router / Table / Form すべて Svelte 版あり |
+| TanStack 対応 | フル対応 | Query / Table / Form は Svelte 版あり。Router は React / Solid のみ（Svelte 版なし） |
 | DevTools | 成熟 | ブラウザ拡張あり、機能は限定的 |
 
 SolidJS よりエコシステムは厚く、SvelteKit は SolidStart より成熟している。ただし React の「大体ある」とは言えず、ライブラリ選定のたびに「Svelte 版があるか」を確認するコストがかかる。
 
 #### Svelte 4 → 5 の破壊的変化
 
-Svelte 5（2024年11月）は Runes という大きな概念変更を伴った。後方互換はあるが問題がある：
+Svelte 5（2024年10月）は Runes という大きな概念変更を伴った。後方互換はあるが問題がある：
 
 - 既存の Svelte 4 コードは Svelte 5 でも動作するが、新しい書き方を使うためには段階的な書き直しが必要
 - Svelte 4 の `$:` リアクティブ宣言・`writable` / `readable` ストアは Svelte 5 でも使えるが、「どちらを使うべきか」が曖昧になりやすい
@@ -317,7 +320,7 @@ Svelte と Vue はどちらも SFC（Single File Component）を採用してお�
 | `useEffect` 相当 | `$effect`（自動依存追跡） | `watchEffect`（自動依存追跡） |
 | パラダイム | なし（Runes に統一） | Options API / Composition API の混在 |
 
-最大の技術的差異は VDOM の扱い。Svelte はコンパイル時に Direct DOM 操作コードを生成し、最初から VDOM を持たない。Vue 3 は Vapor Mode（Vue 3.6 目標）で同じ方向へ移行中だが、既存エコシステムとの互換性を保ちながら段階的に移行するため、Svelte の「設計当初からない」とは出自が異なる。
+最大の技術的差異は VDOM の扱い。Svelte はコンパイル時に Direct DOM 操作コードを生成し、最初から VDOM を持たない。Vue 3 は Vapor Mode（Vue 3.6 beta、2025年12月にベータリリース）で同じ方向へ移行中だが、既存エコシステムとの互換性を保ちながら段階的に移行するため、Svelte の「設計当初からない」とは出自が異なる。
 
 `ref().value` の煩雑さは Vue のよく指摘される問題で、Svelte はこれを持たない。ただし Svelte は `$` シジルのルールを覚える必要があり（Rune と store 自動購読の区別など）、別の認知コストがある。Vue が Options API / Composition API の二重パラダイムを抱えているのに対し、Svelte は Svelte 5 から Runes への統一が進んでいる——これは Vue より明確な方向性。
 
@@ -340,7 +343,7 @@ Vue の Vapor Mode が完成した後の世界では、「VDOM なしのリア�
 
 ## Part 3 — ロードマップ
 
-### Svelte 5（2024年11月リリース済み）
+### Svelte 5（2024年10月リリース済み）
 
 Svelte 5 の最大の変更点は **Runes**。暗黙的なリアクティビティ（コンパイラが `let` を自動でリアクティブに変換）から、明示的なコンパイラマクロへの転換。
 
@@ -364,7 +367,7 @@ Svelte 5 の最大の変更点は **Runes**。暗黙的なリアクティビテ�
 </script>
 ```
 
-`$effect` の依存配列が不要な点は `watchEffect`（Vue）・`createEffect`（SolidJS）と同じ設計。コンパイラがスコープ内で参照している `$state` / `$derived` を自動追跡する。その他のRune：`$props`（コンポーネント props）・`$bindable`（双方向バインド可能な prop）・`$effect.pre`（DOM 更新前の副作用）・`$inspect`（開発時デバッグ）も提供されている。
+`$effect` の依存配列が不要な点は `watchEffect`（Vue）・`createEffect`（SolidJS）と同じ設計。Svelte 5 では依存追跡が**ランタイム**で行われる（Vue / SolidJS と同じ方式）。コンパイラは `$state` / `$derived` / `$effect` を Signal ランタイムの呼び出しに変換するが、「どの Signal がどの Effect に依存しているか」の追跡は実行時に行われる。Svelte 4 の `$:` がコンパイル時の静的解析で依存を決定していたのとは対照的。その他のRune：`$props`（コンポーネント props）・`$bindable`（双方向バインド可能な prop）・`$effect.pre`（DOM 更新前の副作用）・`$inspect`（開発時デバッグ）も提供されている。
 
 #### Svelte 4 との比較
 
@@ -393,7 +396,7 @@ export const actions = {
     const data = await request.formData()
     const title = data.get('title') as string
     await postApi.create({ title, body: data.get('body') as string })
-    throw redirect(303, '/')
+    redirect(303, '/')
   }
 }
 ```

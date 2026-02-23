@@ -3,6 +3,7 @@
 > 現在のスタック（React 19）を SolidJS に置き換えた場合どうなるか、という個人的な考察。決定ではない。
 
 作成：2026-02-22
+更新：2026-02-23
 
 ---
 
@@ -26,7 +27,7 @@ README に記載した技術トレンドの多くが React を前提にした整
 | Vitest + MSW | そのまま使える | なし |
 | Vite | そのまま使える | なし |
 
-本プロジェクトでは SWR を廃止し React Router `loader` に移行済み。`loader` と `createResource` はどちらも「レンダリング前のデータ取得」という同じ目的を持ち、構造的に近い。
+本プロジェクトでは SWR を廃止し React Router `loader` に移行済み。React Router の `loader` はナビゲーション完了前にデータを取得してブロックする設計だが、SolidJS の `createResource` はレンダリング中にフェッチを開始し Suspense と連携して表示を制御する。ルーター単位のプリフェッチが必要な場合は `@solidjs/router` の `preload` 関数を使う。
 
 ### 設計プリミティブの変化
 
@@ -57,11 +58,11 @@ export async function rootLoader(): Promise<{ user: User | null }> {
 
 ```ts
 // SolidJS — モジュール export で済む（ルーターと無関係に状態管理）
-export const [user] = createResource(fetchCurrentUser);
+export const [user, { refetch: refetchUser }] = createResource(fetchCurrentUser);
 
 export async function login(credentials) {
   await apiLogin(credentials);
-  user.refetch();
+  refetchUser();
 }
 ```
 
@@ -142,16 +143,20 @@ React で Zustand / Jotai が必要になる理由は「Hook はコンポーネ�
 
 ### 状態管理の4層モデル
 
-README では React の設計都合から状態を4層に分類した。SolidJS では Signal がグローバルにも使えるため、層の境界が一部融合する。
+README では状態を所在とスコープで4層（URL State / Server State / Global State / Local State）に分類した。SolidJS では Signal がグローバルにも使えるため、層の境界が一部融合する。
 
-- **サーバー状態** → `createResource` または TanStack Query for Solid
-- **グローバルUI状態** → Signal をモジュール export するだけ。Context + Provider が不要になるケースが多い
-- **複雑なネストオブジェクト** → `createStore`（Zustand / Jotai 不要）
-- **フォーム・ローカル状態** → `createSignal`（変わらない）
+| 層 | SolidJS での実装 |
+|----|-----------------|
+| **URL State** | `@solidjs/router` の `useSearchParams`（リアクティブプロキシ） |
+| **Server State** | `createResource` または TanStack Query for Solid |
+| **Global State** | Signal をモジュール export するだけ。Context + Provider が不要になるケースが多い |
+| **Local State** | `createSignal`（変わらない） |
+
+ネストしたオブジェクト状態には `createStore`（Zustand / Jotai 不要）が使える。
 
 ### ルーティング設計
 
-`@solidjs/router` は React Router v7 Data と構造が近く、置き換えコストは低い。`load` 関数でルート単位のデータフェッチが組み込みでできる点も Data モードの `loader` と対応している。
+`@solidjs/router` は React Router v7 Data と構造が近く、置き換えコストは低い。`preload` 関数（v0.14 で `load` から改名）でルート単位のデータプリフェッチが組み込みでできる点も Data モードの `loader` と対応している。ただし `loader` がナビゲーションをブロックしてデータを返すのに対し、`preload` はキャッシュを温めるだけでナビゲーションをブロックしない——データの消費は `createAsync` や `createResource` を通じて Suspense と連携する設計になっている。
 
 ただし SolidStart は 2024 年に 1.0 到達したばかりで、Next.js と同列に語れる成熟度ではまだない。
 
@@ -161,7 +166,7 @@ README の「次の実験候補」を SolidJS 視点で見ると：
 
 - **`useActionState`** → Signal + `createResource` で自然に代替できる。専用 API は不要
 - **`useOptimistic`** → Signal を即時更新してサーバー応答で上書きするパターンで代替できる
-- **Suspense + `React.lazy`** → Solid 組み込みの `<Suspense>` と `lazy()` で対応。`createResource` とネイティブ統合しており React より安定して動く
+- **Suspense + `React.lazy`** → Solid 組み込みの `<Suspense>` と `lazy()` で対応。`createResource` とネイティブ統合されている。VDOM を持たないため Suspense 境界の挙動が React より単純で予測しやすい（React 19 で Suspense は正式安定したが、reconciliation モデルとの相互作用は依然複雑）
 - **RSC** → SolidStart はサーバー関数ベースの別路線。RSC とは設計思想が異なる
 
 ---
@@ -175,7 +180,7 @@ README の「次の実験候補」を SolidJS 視点で見ると：
 Signal ベースのリアクティビティにも別種の複雑さが存在する：
 
 - `untrack()` でトラッキングを意図的に切る必要がある場面がある
-- リアクティブスコープ外で Signal を読んでも値が追跡されず、無音で失敗する
+- リアクティブスコープ外で Signal を読むと現在値は取得できるが購読が作られないため、値が変化しても UI が更新されない（コンポーネント関数が1回しか実行されないため、早期に変数へ展開すると追跡が切れる）
 - `batch()` による更新のバッチング管理
 
 **推測：** 「SolidJS に移行して楽になった」という声の一部は、React の複雑なユースケース（グローバル状態、複雑な Effect）から SolidJS で書いた小規模アプリへの比較をしている。同規模・同要件で比較した場合の差はより小さいはず。
