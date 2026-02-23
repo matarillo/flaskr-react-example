@@ -120,7 +120,7 @@ const { data, isLoading } = useQuery({
 </script>
 ```
 
-Vue Router が返す `route` はリアクティブオブジェクトであり、URL が変わると `route.query.page` が自動更新される。TanStack Query for Vue の `queryKey` が `computed` を受け取ることで、key 変化時に自動再フェッチが走る。React Router の loader はナビゲーション時に再実行されるため URL パラメータの取得は直接的だが、「URL は変えずにデータだけ再取得する」操作には向かない。Vue の `computed` + TanStack Query は依存関係がより宣言的。
+Vue Router が返す `route` はリアクティブオブジェクトであり、URL が変わると `route.query.page` が自動更新される。TanStack Query for Vue の `queryKey` が `computed` を受け取ることで、key 変化時に自動再フェッチが走る。React Router の loader はナビゲーション時に再実行されるため URL パラメータの取得は直接的。`useFetcher` で URL を変えずに action + 再検証を得ることも可能だが、データ取得の契機は常にルーターイベントに結合している。Vue の `computed` + TanStack Query は依存関係がより宣言的であり、キャッシュキー単位でデータの再取得を制御できる。
 
 #### 複数 Mutation の状態管理
 

@@ -86,7 +86,7 @@ React の状態は**所在とスコープ**によって4層に分類できる（
 | 関心事 | 本プロジェクトでの実装 |
 |--------|----------------------|
 | ミューテーション実行 | React Router `action` + `<Form method="post">` |
-| 自動再検証 | action 完了後に loader が自動再実行。手動キャッシュ無効化が不要 |
+| 再検証 | action 完了後に loader が自動再実行（`<Form>` / `useFetcher` いずれも）。`useRevalidator` による明示的な再実行も可能。手動キャッシュ無効化が不要 |
 | フォーム入力管理 | `<Form>` の name 属性（非制御）。React Router が FormData を管理するため `useState` 不要 |
 | エラーハンドリング | action が `{ error }` を返し、`useActionData()` で表示 |
 
@@ -102,9 +102,11 @@ React Router Data モードでは Server State の取得（loader）と変更（
 
 紐づいていなければ loader に取得契機がないので、キャッシュ層がほぼ必須になる（通知、フィーチャーフラグ、ルートをまたぐ共有データなど）。本プロジェクトでは全データがルートまたはクエリパラメータに対応しており、この条件を満たす。
 
-**2. 全 mutation がナビゲーションを伴うか**
+**2. 全 mutation が React Router の action を経由するか**
 
-データが URL に紐づいていても、mutation 後にナビゲーションが発生しなければ auto-revalidation は効かない。本プロジェクトでは `createAction` / `updateAction` が成功時に `redirect('/')` を返すので、mutation → ナビゲーション → loader 再実行の流れが常に成立する。インライン編集（その場で保存、ページ遷移なし）を導入すれば、この条件が崩れてキャッシュ管理が必要になる。
+React Router では action を経由する mutation であれば、ナビゲーションの有無にかかわらず全アクティブ loader が自動再実行される。`<Form>` は action 後にナビゲーションを起こすが、`useFetcher` は URL を変えずに action を実行し同じ自動再検証を得る。さらに `useRevalidator` を使えば action を介さない明示的な再検証も可能である。つまり React Router の再検証能力はナビゲーションに限定されない。
+
+本プロジェクトでは `<Form>` + `redirect('/')` のみを使用しており、mutation → ナビゲーション → loader 再実行の流れが常に成立する。これは CRUD の全操作がページ遷移を伴うという要件に合致しているためであり、ナビゲーションなしの mutation（インライン編集など）が必要になっても `useFetcher` で対応でき、直ちにキャッシュ層が必要になるわけではない。
 
 **3. 常に最新データの取得を待つ UX が許容されるか**
 
@@ -116,13 +118,13 @@ React Router Data モードでは Server State の取得（loader）と変更（
 
 | ユースケース | 例 | なぜ loader では不十分か |
 |----|----|----|
-| ポーリング / リアルタイム更新 | チャット、通知バッジ | loader はナビゲーション時にしか走らない。定期的な再取得が必要 |
+| ポーリング / リアルタイム更新 | チャット、通知バッジ | `useRevalidator` で定期再取得は可能だが全 loader が再実行される。特定データだけの軽量なポーリングにはキャッシュキー単位で制御できる専用ライブラリが適する |
 | 複数コンポーネントでのデータ共有 | サイドバーとメインで同一データ | loader はルート単位。グローバルキャッシュで重複リクエストを排除したい |
 | 無限スクロール | フィード、検索結果 | loader は「現在のページ」を返すだけ。過去ページの蓄積は自前管理が必要 |
 | 楽観的更新 | いいねボタン、トグル | React Router にも optimistic UI はあるが、SWR/TanStack Query の方がシンプルな場合がある |
 | ルートと無関係なバックグラウンドデータ | 設定、フィーチャーフラグ | URL 遷移と関係なく取得・キャッシュしたいデータ |
 
-判断の流れ：**データが URL に紐づかない → ほぼ確実にキャッシュ層が必要**。紐づく場合でも、mutation がナビゲーションを伴わない、または stale 表示なしの UX が許容されないなら、SWR / TanStack Query の導入を検討する。
+判断の流れ：**データが URL に紐づかない → ほぼ確実にキャッシュ層が必要**。紐づく場合でも、mutation が React Router の action を経由しない、または stale 表示なしの UX が許容されないなら、SWR / TanStack Query の導入を検討する。
 
 | | SWR | TanStack Query |
 |--|--|--|
@@ -152,7 +154,7 @@ Declarative モードでは `<Link to="...">` や `useParams()` に型が付か�
 - **protectedLoader**：認証チェックを行い、未認証なら `redirect('/')` を返す
 - **action**：`<Form method="post">` からの送信を受け取り、API 呼び出し後に `redirect('/')` または `{ error }` を返す
 - **intent パターン**：1つのルートで複数の操作（update / delete）を `<input type="hidden" name="intent">` で区別する
-- **自動 revalidation**：action 完了後、同ルートの loader が自動で再実行される。手動のキャッシュ無効化は不要
+- **revalidation**：action 完了後、全アクティブルートの loader が自動で再実行される。手動のキャッシュ無効化は不要。`<Form>` による action はナビゲーションを伴うが、`useFetcher` は URL を変えずに action を実行し同じ自動再検証を得る。`useRevalidator` を使えば action を介さない明示的な再検証も可能
 
 #### 2025年のカスタムSPAにおけるルーター比較
 
@@ -173,15 +175,19 @@ Declarative モードでは `<Link to="...">` や `useParams()` に型が付か�
 
 ## 次の実験候補
 
-### 現在のスタックで即実施可能
+### 現アーキテクチャの深掘り
 
-1. **`useActionState`（React 19 ネイティブ）** — 現在 `useActionData` + `useNavigation` で管理している「送信中か / エラーは何か」を React 19 標準 API に置き換える。ライブラリ追加なしで完結する最小の実験
-2. **`useOptimistic`（React 19 ネイティブ）による楽観的UI** — React が直接管理する楽観的更新の仕組みを試す。SPA では `useTransition` + 非同期関数と組み合わせて使えるが、本来の力は Server Actions + RSC との組み合わせで発揮される
+React Router Data モード + React 19 の能力と限界を見極める実験。
+
+1. **`useActionState`（React 19）** — 現在 `useActionData` + `useNavigation` で管理している「送信中か / エラーは何か」を React 19 標準 API に置き換える。最小の API 置換実験
+2. **いいね機能 — ナビゲーションなしの revalidation + `useOptimistic`** — 投稿へのいいねトグルを実装し、`useFetcher` action による URL 変更なしの自動再検証と `useOptimistic` による楽観的 UI を統合的に試す。一覧ページで複数 fetcher が並行動作する状況、1件の変更でルート全体が再取得される revalidation 粒度の制約、連打時の race condition など、Data モードの能力の境界が体感できる
 3. **Suspense + `React.lazy` によるコード分割** — 各ルートコンポーネントを遅延読み込みし Suspense でローディング UI を宣言的に配置する
 
-### ライブラリの追加・変更を伴う
+### 代替アーキテクチャの体験
 
-4. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。TanStack Query との組み合わせで Suspense を使ったデータフェッチのローディング体験統合が実現しやすい
+異なるルーティング・データ取得パラダイムとの比較。上記の実験で感じた Data モードの制約が、別のアプローチでどう解決されるかを確認する。
+
+4. **TanStack Router** — ファイルベース＋完全型安全ルーティングを体験する。TanStack Query との組み合わせで、正規化キャッシュによるルート横断のデータ共有や Suspense ベースのローディング統合が実現しやすい
 5. **React Router Framework モード** — `routes.ts` によるファイルベースルーティングを試す
 
 ## 起動方法

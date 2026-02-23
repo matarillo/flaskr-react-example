@@ -236,7 +236,7 @@ routes/
 README の「次の実験候補」を Svelte 視点で見ると：
 
 - **`useActionState`** → SvelteKit の Form Actions（`+page.server.ts` の `actions`）が対応する。`use:enhance` のコールバックで `pending` 状態とエラーが自動管理される。SPA 構成では `$state` + 非同期関数で代替できる
-- **`useOptimistic`** → `$state` を即時更新してサーバー応答で上書きするパターンで代替できる。Svelte の代入ベース更新は `useOptimistic` より自然に書ける
+- **いいね機能（`useFetcher` + `useOptimistic`）** → `useFetcher` による URL 変更なしの action + 再検証は、SPA 構成なら TanStack Query の mutation + `invalidateQueries` で対応可能。楽観的更新は `$state` の即時更新で `useOptimistic` より自然に書ける
 - **`Suspense + React.lazy`** → `{#await promise}` ブロックがコンポーネントレベルの非同期 UI に対応する。ルート単位のコード分割は SvelteKit が自動化しており `React.lazy` に相当するものを書く必要がない
 - **RSC（React Server Components）** → SvelteKit の `+page.server.ts` はサーバーサイドのデータ取得・ミューテーションを担う点で概念的に近いが、RSC の「サーバーコンポーネントをクライアントに組み込む」モデルとは異なる。SvelteKit は「サーバー関数がデータを返し、クライアントコンポーネントが受け取る」という明確な分離を持つ別路線
 

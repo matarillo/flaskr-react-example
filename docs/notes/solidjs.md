@@ -122,7 +122,7 @@ const [posts] = createResource(
 );
 ```
 
-React Router の loader はナビゲーション（URL 変化）時に再実行されるため、URL パラメータの取得は直接的。ただし loader はナビゲーションイベントに結合しており、「URL は変えずにデータだけ再取得する」操作には向かない。SolidJS の `createResource` はリアクティビティシステムに組み込まれた非同期プリミティブであり、ソース関数がリアクティブスコープ内で実行されるため依存関係が自動追跡される。`createResource` + `<Suspense>` は設計の一部として統合されている。
+React Router の loader はナビゲーション（URL 変化）時に再実行されるため、URL パラメータの取得は直接的。`useFetcher` を使えば URL を変えずに action を実行し loader の自動再検証を得ることも可能だが、データ取得の契機は常にルーターイベント（ナビゲーションまたは action 完了）に結合している。SolidJS の `createResource` はリアクティビティシステムに組み込まれた非同期プリミティブであり、ソース関数がリアクティブスコープ内で実行されるため依存関係が自動追跡される。`createResource` + `<Suspense>` は設計の一部として統合されている。
 
 #### 複雑なネストオブジェクト — createStore で Zustand / Jotai が不要になる
 
@@ -165,7 +165,7 @@ README では状態を所在とスコープで4層（URL State / Server State / 
 README の「次の実験候補」を SolidJS 視点で見ると：
 
 - **`useActionState`** → Signal + `createResource` で自然に代替できる。専用 API は不要
-- **`useOptimistic`** → Signal を即時更新してサーバー応答で上書きするパターンで代替できる
+- **いいね機能（`useFetcher` + `useOptimistic`）** → `useFetcher` による URL 変更なしの action + 再検証は `createResource` の `refetch` で代替できる。楽観的更新は Signal の即時更新で対応可能。React Router では action 完了後に全アクティブ loader が再実行されるのに対し、SolidJS では `createResource` 単位で再取得を制御でき粒度が細かい
 - **Suspense + `React.lazy`** → Solid 組み込みの `<Suspense>` と `lazy()` で対応。`createResource` とネイティブ統合されている。VDOM を持たないため Suspense 境界の挙動が React より単純で予測しやすい（React 19 で Suspense は正式安定したが、reconciliation モデルとの相互作用は依然複雑）
 - **RSC** → SolidStart はサーバー関数ベースの別路線。RSC とは設計思想が異なる
 
