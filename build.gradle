@@ -58,8 +58,8 @@ jacocoTestReport {
 
 sonar {
   properties {
-    property "sonar.projectKey", "matarillo-bitbucket_flaskr-backend"
-    property "sonar.organization", "matarillo-bitbucket"
+    property "sonar.projectKey", "matarillo-github_flaskr-backend"
+    property "sonar.organization", "matarillo-github"
 	property "sonar.projectName", "flaskr-backend"
   }
 }
