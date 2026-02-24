@@ -39,8 +39,8 @@ jobs:
         with:
           projectBaseDir: frontend
           args: >
-            -Dsonar.projectKey=matarillo-bitbucket_flaskr-frontend
-            -Dsonar.organization=matarillo-bitbucket
+            -Dsonar.projectKey=matarillo-github_flaskr-frontend
+            -Dsonar.organization=matarillo-github
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
 
       - name: Copy test reports
